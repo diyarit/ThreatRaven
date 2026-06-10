@@ -1438,7 +1438,7 @@ legendDiv.innerHTML='';
 sortedKw.forEach((kw,i)=>{
 const item=document.createElement('div');
 item.className='legend-item';
-item.innerHTML='<div class="legend-color" style="background:'+bgColors[i]+'"></div><span class="legend-text">'+escapeHtml(kw[0])+'</span><span class="legend-count">'+kw[1]+'</span>';
+item.innerHTML='<div class="legend-color" style="background:'+bgColors[i]+'"></div><span class="legend-text">'+escapeHtml(kw[0])+'</span> <span class="legend-count">'+kw[1]+'</span>';
 legendDiv.appendChild(item);
 });
 
