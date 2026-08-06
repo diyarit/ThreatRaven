@@ -1,4 +1,5 @@
 {
+    "SchemaVersion": 1,
     "Settings": {
         "VulnDays": 7,
         "ThrottleLimit": 10,
@@ -7,7 +8,21 @@
         "RetryBaseDelaySeconds": 2,
         "LogLevel": "Info",
         "ValidateCertificates": true,
-        "ExportHealthReport": false
+        "ExportHealthReport": false,
+        "NvdEnabled": true,
+        "NvdApiKey": "",
+        "NvdMaxResults": 2000,
+        "NvdCacheHours": 6,
+        "NvdKeywordFilter": false,
+        "MinHostRequestIntervalMs": 250,
+        "GlobalTimeoutSeconds": 900,
+        "StateRetentionDays": 90,
+        "StateMaxEntries": 20000,
+        "ReportHistoryDays": 7,
+        "LogRetentionDays": 14,
+        "EnableConditionalRequests": true,
+        "WebhookEnabled": false,
+        "WebhookUrl": ""
     },
     "Keywords": [
         "APT",

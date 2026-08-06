@@ -1,14 +1,20 @@
 # Generated reports
 *.csv
 *.html
+!assets/report-template.html
 
 # Logs
 *.log
 logs/
+*.jsonl
 
 # Backups
 *.bak
 *.bak3
+
+# Persistent state
+ThreatRavenState.json
+ThreatRavenState.json.bak
 
 # Config snapshots
 RunConfig_*.json

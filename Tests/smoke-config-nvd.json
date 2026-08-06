@@ -1,0 +1,48 @@
+{
+    "SchemaVersion": 1,
+    "Settings": {
+        "VulnDays": 2,
+        "ThrottleLimit": 2,
+        "FeedTimeoutSeconds": 20,
+        "MaxRetries": 2,
+        "RetryBaseDelaySeconds": 1,
+        "LogLevel": "Info",
+        "ValidateCertificates": true,
+        "ExportHealthReport": false,
+        "NvdEnabled": true,
+        "NvdApiKey": "",
+        "NvdMaxResults": 100,
+        "NvdCacheHours": 6,
+        "NvdKeywordFilter": false,
+        "MinHostRequestIntervalMs": 0,
+        "GlobalTimeoutSeconds": 300,
+        "StateRetentionDays": 90,
+        "StateMaxEntries": 2000,
+        "ReportHistoryDays": 7,
+        "LogRetentionDays": 14,
+        "EnableConditionalRequests": false,
+        "WebhookEnabled": false,
+        "WebhookUrl": ""
+    },
+    "Keywords": [
+        "Ransomware",
+        "Phishing"
+    ],
+    "MitreKeywords": {
+        "T1566": {
+            "Name": "Phishing",
+            "Keywords": [
+                "phishing"
+            ]
+        }
+    },
+    "Feeds": [
+        "https://www.thehackernews.com/feeds/posts/default"
+    ],
+    "UserAgents": [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+    ],
+    "AllowedUrlPatterns": [
+        "^https?://"
+    ]
+}

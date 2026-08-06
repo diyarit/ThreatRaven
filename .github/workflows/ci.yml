@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  pester:
+    name: Pester tests (PS 5.1 + 7)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Pester tests
+        shell: ${{ matrix.shell }}
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
+          Import-Module $pester -Force
+          Invoke-Pester -Path ./Tests/FeedHelpers.Tests.ps1 -PassThru |
+            Select-Object -ExpandProperty FailedCount |
+            ForEach-Object { if ($_ -gt 0) { exit 1 } }
+
+  analyzer:
+    name: PSScriptAnalyzer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+
+      - name: Analyze
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
+          if ($results.Count -gt 0) {
+            $results | Format-Table -AutoSize
+            exit 1
+          }
+
+  smoke:
+    name: Smoke run (live feeds, no NVD)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Smoke run
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'report'
+          $state = Join-Path $env:RUNNER_TEMP 'state.json'
+          & ./ThreatRaven.ps1 -ConfigPath ./Tests/smoke-config.json -OutputDir $out -StatePath $state -NonInteractive -NoOpenReport -QuietMode
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $csv = Get-ChildItem -LiteralPath $out -Filter *.csv | Select-Object -First 1
+          if (-not $csv) { Write-Error 'No CSV report generated'; exit 1 }
