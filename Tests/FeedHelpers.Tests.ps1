@@ -241,6 +241,120 @@ Describe 'ThreatRavenState' {
     }
 }
 
+Describe 'Get-FeedStatusLabel' {
+    It 'is unhealthy when a feed failed and never succeeded' {
+        Get-FeedStatusLabel -SuccessCount 0 -FailureCount 1 | Should Be 'unhealthy'
+        Get-FeedStatusLabel -SuccessCount 0 -FailureCount 5 | Should Be 'unhealthy'
+    }
+
+    It 'is degraded when a feed succeeded but with more than 2 failures' {
+        Get-FeedStatusLabel -SuccessCount 1 -FailureCount 3 | Should Be 'degraded'
+    }
+
+    It 'is healthy with no failures or few failures alongside successes' {
+        Get-FeedStatusLabel -SuccessCount 1 -FailureCount 0 | Should Be 'healthy'
+        Get-FeedStatusLabel -SuccessCount 1 -FailureCount 2 | Should Be 'healthy'
+        Get-FeedStatusLabel -SuccessCount 0 -FailureCount 0 | Should Be 'healthy'
+    }
+}
+
+Describe 'ConvertFrom-FeedContent byte input' {
+    It 'parses UTF-8 bytes with non-ASCII characters intact' {
+        $eAcute = [string][char]0xE9
+        $xml = '<?xml version="1.0" encoding="utf-8"?><rss version="2.0"><channel><item><title>Caf' + $eAcute + '</title><link>https://a.example/1</link></item></channel></rss>'
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($xml)
+        $result = ConvertFrom-FeedContent -Bytes $bytes
+        $result.Error | Should Be $null
+        $result.Items[0].title | Should Be ('Caf' + $eAcute)
+    }
+
+    It 'honors the XML prolog encoding for non-UTF-8 bytes' {
+        $eAcute = [string][char]0xE9
+        $xml = '<?xml version="1.0" encoding="iso-8859-1"?><rss version="2.0"><channel><item><title>Caf' + $eAcute + '</title><link>https://a.example/1</link></item></channel></rss>'
+        $bytes = [System.Text.Encoding]::GetEncoding('iso-8859-1').GetBytes($xml)
+        $result = ConvertFrom-FeedContent -Bytes $bytes
+        $result.Error | Should Be $null
+        $result.Items[0].title | Should Be ('Caf' + $eAcute)
+    }
+
+    It 'detects HTML pages masquerading as feeds from bytes' {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes('<!doctype html><html><body></body></html>')
+        $result = ConvertFrom-FeedContent -Bytes $bytes
+        $result.Error | Should Be 'Feed returned HTML instead of XML (URL may point to a webpage)'
+    }
+
+    It 'reports empty content for an empty byte array' {
+        $result = ConvertFrom-FeedContent -Bytes ([byte[]]@())
+        $result.Error | Should Be 'Empty content'
+    }
+}
+
+Describe 'Save-ThreatRavenState atomic write' {
+    It 'leaves no temp file and keeps a .bak of the previous state' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('tr_state_' + [guid]::NewGuid().ToString('N') + '.json')
+        try {
+            $state = Initialize-ThreatRavenState -Path $tmp
+            Save-ThreatRavenState -State $state -Path $tmp
+            Test-Path -LiteralPath $tmp | Should Be $true
+            Test-Path -LiteralPath "$tmp.tmp" | Should Be $false
+
+            # Second save swaps atomically and keeps the previous version
+            $state.Items['https://a.example/1'] = [PSCustomObject]@{
+                Normalized = 'https://a.example/1'
+                Date       = (Get-Date).ToString('o')
+                Link       = 'https://a.example/1'
+                LastSeen   = (Get-Date).ToString('o')
+            }
+            Save-ThreatRavenState -State $state -Path $tmp
+            Test-Path -LiteralPath "$tmp.tmp" | Should Be $false
+            Test-Path -LiteralPath "$tmp.bak" | Should Be $true
+
+            $loaded = Initialize-ThreatRavenState -Path $tmp
+            $loaded.Items.Count | Should Be 1
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp, "$tmp.tmp", "$tmp.bak" -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Describe 'Test-UrlSafety scheme anchoring' {
+    It 'accepts http(s) URLs whose query merely contains a scheme-like token' {
+        Test-UrlSafety -Url 'https://example.com/read?next=data:text/plain' | Should Be $true
+        Test-UrlSafety -Url 'https://example.com/a?u=ftp://x.example/f' | Should Be $true
+    }
+
+    It 'still rejects dangerous schemes and HTML injection' {
+        Test-UrlSafety -Url 'javascript:alert(1)' | Should Be $false
+        Test-UrlSafety -Url 'https://example.com/a?x=<script>1</script>' | Should Be $false
+    }
+}
+
+Describe 'Save-RunConfiguration secret redaction' {
+    It 'redacts NvdApiKey and WebhookUrl but keeps empty values empty' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('tr_runcfg_' + [guid]::NewGuid().ToString('N') + '.json')
+        try {
+            $cfg = @{
+                SchemaVersion = 1
+                Settings      = @{ NvdApiKey = 'super-secret'; WebhookUrl = 'https://hooks.example/x'; LogLevel = 'Info'; ThrottleLimit = 10 }
+                Keywords      = @('k')
+                MitreKeywords = @{ T1566 = @{ Name = 'Phishing'; Keywords = @('phish') } }
+                Feeds         = @('https://a.example/feed')
+            } | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+
+            Save-RunConfiguration -Config $cfg -Path $tmp -StatePath 'state.json'
+            $saved = Get-Content -LiteralPath $tmp -Raw | ConvertFrom-Json
+            $saved.Settings.NvdApiKey | Should Be '***REDACTED***'
+            $saved.Settings.WebhookUrl | Should Be '***REDACTED***'
+            $saved.Settings.LogLevel | Should Be 'Info'
+            (Get-Content -LiteralPath $tmp -Raw) | Should Not Match 'super-secret'
+        }
+        finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'Get-WebResponseHeader' {
     It 'reads headers from a dictionary-style response' {
         $response = [PSCustomObject]@{

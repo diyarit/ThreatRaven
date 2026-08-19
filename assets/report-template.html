@@ -79,6 +79,7 @@ body{font-family:'Inter','SF Pro Text','Segoe UI',system-ui,sans-serif;backgroun
 .chart-inner{display:flex;align-items:center;gap:20px}
 .chart-canvas{flex:0 0 150px;height:150px}
 .chart-legend{flex:1}
+.chart-fallback{display:flex;align-items:center;justify-content:center;height:100%;min-height:80px;color:var(--dim);font-size:12px;text-align:center;padding:10px}
 .leg{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;font-size:14px}
 .leg:hover{background:var(--accent-g)}
 .leg-c{width:12px;height:4px;border-radius:2px;flex-shrink:0}
@@ -344,6 +345,20 @@ const KEYWORD_TOP_N={{KEYWORD_TOP_N}};
 let chart=null;
 let mitreChart=null;
 let vulnChart=null;
+
+function makeChart(canvasId,cfg,prev){
+if(prev)prev.destroy();
+const cv=document.getElementById(canvasId);
+if(!cv)return null;
+if(typeof Chart==='undefined'){
+const d=document.createElement('div');
+d.className='chart-fallback';
+d.textContent='Chart unavailable — chart.min.js could not be loaded.';
+cv.parentNode.replaceChild(d,cv);
+return null;
+}
+return new Chart(cv.getContext('2d'),cfg);
+}
 let allVulnData=[];
 let filteredVulnData=[];
 let activeSeverityFilter='ALL';
@@ -580,13 +595,11 @@ item.innerHTML='<div class="legend-color" style="background:'+bgColors[i]+'"></d
 legendDiv.appendChild(item);
 });
 
-if(chart)chart.destroy();
-const ctx=document.getElementById('chart').getContext('2d');
-chart=new Chart(ctx,{
+chart=makeChart('chart',{
 type:'doughnut',
 data:{labels:labels,datasets:[{data:data,backgroundColor:bgColors,borderWidth:2,borderColor:getComputedStyle(document.documentElement).getPropertyValue('--card')}]},
 options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
-});
+},chart);
 }
 
 function openMitreModal(){
@@ -688,13 +701,11 @@ const labels=sortedMitre.map(x=>x[0].split(' - ')[0]);
 const data=sortedMitre.map(x=>x[1]);
 const bgColors=['#f85149','#db6d28','#d29922','#3fb950','#58a6ff','#bc8cff','#f0883e','#56d364','#79c0ff','#d2a8ff'];
 
-if(mitreChart)mitreChart.destroy();
-const ctx=document.getElementById('mitreChart').getContext('2d');
-mitreChart=new Chart(ctx,{
+mitreChart=makeChart('mitreChart',{
 type:'bar',
 data:{labels:labels,datasets:[{label:'Occurrences',data:data,backgroundColor:bgColors,borderWidth:0}]},
 options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}
-});
+},mitreChart);
 }
 
 function filterMitreTechniques(){
@@ -776,13 +787,11 @@ const labels=['Critical','High','Medium','Low'];
 const data=[stats.CRITICAL,stats.HIGH,stats.MEDIUM,stats.LOW];
 const bgColors=['#e74c3c','#f39c12','#f1c40f','#27ae60'];
 
-if(vulnChart)vulnChart.destroy();
-const ctx=document.getElementById('vulnChart').getContext('2d');
-vulnChart=new Chart(ctx,{
+vulnChart=makeChart('vulnChart',{
 type:'bar',
 data:{labels:labels,datasets:[{label:'Vulnerabilities',data:data,backgroundColor:bgColors,borderWidth:0}]},
 options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
-});
+},vulnChart);
 }
 
 function renderVulnTable(){

@@ -15,6 +15,9 @@
         "NvdCacheHours": 6,
         "NvdKeywordFilter": false,
         "MinHostRequestIntervalMs": 250,
+        "HostRequestIntervalMsOverrides": {
+            "reddit.com": 10000
+        },
         "GlobalTimeoutSeconds": 900,
         "StateRetentionDays": 90,
         "StateMaxEntries": 20000,
@@ -488,7 +491,7 @@
         "https://unit42.paloaltonetworks.com/feed/",
         "https://www.welivesecurity.com/feed/",
         "https://www.crowdstrike.com/blog/feed/",
-        "https://www.mandiant.com/resources/blog/rss.xml",
+        "https://cloudblog.withgoogle.com/topics/threat-intelligence/rss/",
         "https://research.checkpoint.com/feed/",
         "https://blog.badsectorlabs.com/feeds/all.atom.xml",
         "https://cyberbuilders.substack.com/feed",
@@ -504,7 +507,7 @@
         "https://any.run/cybersecurity-blog/feed/",
         "https://www.exploitone.com/feed/",
         "https://www.cisa.gov/cybersecurity-advisories/all.xml",
-        "https://hackread.com/feed/",
+        "https://feeds.feedburner.com/HackRead",
         "https://www.hackmageddon.com/feed/",
         "https://www.infosecurity-magazine.com/rss/news/",
         "https://krebsonsecurity.com/feed/",
@@ -551,13 +554,12 @@
         "https://www.bellingcat.com/feed/",
         "https://www.grahamcluley.com/feed/",
         "https://www.theguardian.com/technology/data-computer-security/rss",
-        "https://www.intezer.com/blog/feed/",
         "https://www.schneier.com/blog/atom.xml",
         "http://securityaffairs.co/wordpress/feed",
         "https://www.wired.com/feed/category/security/latest/rss",
         "https://sed-cms.broadcom.com/rss/v1/blogs/rss.xml",
         "https://blog.eclecticiq.com/rss.xml",
-        "http://feeds.feedburner.com/fortinet/blog/threat-research"
+        "https://feeds.fortinet.com/fortinet/blog/threat-research"
     ],
     "AllowedUrlPatterns": [
         "^https?://",
@@ -568,6 +570,7 @@
         "/rss/?$"
     ],
     "UserAgents": [
+        "ThreatRaven/4.1 (+https://github.com/diyarit/ThreatRaven; RSS threat intel monitor)",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (compatible; Feedfetcher-Google; +http://www.google.com/feedfetcher.html)",
         "FeedBurner/1.0 (http://www.FeedBurner.com)"

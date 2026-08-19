@@ -1,6 +1,17 @@
 # ============================================================
 # FeedHelpers.psm1 - Shared helper functions for ThreatRaven.ps1
-# Version: 4.0
+# Version: 4.1
+#
+# v4.1 changes:
+#  - ConvertFrom-FeedContent accepts raw bytes so XmlReader detects the
+#    real encoding (fixes mojibake on PS 5.1 when charset is missing)
+#  - Atomic state saves (temp file + File.Replace, .bak of last good state)
+#  - Get-FeedStatusLabel: single source of truth for feed health status
+#  - Test-UrlSafety: scheme blocklist anchored to start of URL (no more
+#    false positives on query strings containing "data:" etc.)
+#  - NVD cache invalidated when KeywordFilter/MaxResults change
+#  - Run-config snapshot redacts NvdApiKey and WebhookUrl
+#  - Renamed internal Get-ObjectProperty (shadowed a built-in cmdlet)
 #
 # v4.0 changes:
 #  - Strict-mode safe property access for XML/RSS duck typing
@@ -17,7 +28,7 @@
 
 #Requires -Version 5.1
 
-function Get-ItemPropertyValue {
+function Get-ObjectProperty {
     <#
     .SYNOPSIS
         Strict-mode safe property accessor for XML items / PSCustomObjects.
@@ -109,7 +120,7 @@ function Get-AllTextContent {
     )
 
     foreach ($field in $fieldsToCheck) {
-        $value = Get-ItemPropertyValue -Item $Item -Name $field
+        $value = Get-ObjectProperty -Item $Item -Name $field
         if ($null -eq $value) { continue }
 
         if ($value -is [string]) {
@@ -158,7 +169,7 @@ function Get-FeedItemTitle {
         $Item
     )
 
-    $value = Get-ItemPropertyValue -Item $Item -Name 'title'
+    $value = Get-ObjectProperty -Item $Item -Name 'title'
     $title = $null
 
     if ($value -is [string]) {
@@ -191,7 +202,7 @@ function Get-FeedItemDate {
 
     $raw = $null
     foreach ($name in @('pubDate', 'published', 'updated', 'dc:date', 'date')) {
-        $value = Get-ItemPropertyValue -Item $Item -Name $name
+        $value = Get-ObjectProperty -Item $Item -Name $name
         if ($null -eq $value) { continue }
 
         if ($value -is [string]) {
@@ -249,14 +260,14 @@ function Get-ItemLink {
 
     # 0patch.com special handling
     if ($FeedUrl -match '0patch\.com') {
-        $linkVal = Get-ItemPropertyValue -Item $Item -Name 'link'
+        $linkVal = Get-ObjectProperty -Item $Item -Name 'link'
         if ($linkVal -is [string] -and
             $linkVal -match '^https?://blog\.0patch\.com/\d{4}/\d{2}/' -and
             $linkVal -notmatch '/feeds/|/comments/') {
             return $linkVal.Trim()
         }
 
-        $guidVal = Get-ItemPropertyValue -Item $Item -Name 'guid'
+        $guidVal = Get-ObjectProperty -Item $Item -Name 'guid'
         if ($null -ne $guidVal) {
             $guidText = & $getText $guidVal
             if ($guidText -match '^https?://blog\.0patch\.com/\d{4}/\d{2}/[^/]+\.html') {
@@ -265,8 +276,8 @@ function Get-ItemLink {
         }
 
         $contentToSearch = ''
-        $cVal = Get-ItemPropertyValue -Item $Item -Name 'content'
-        $dVal = Get-ItemPropertyValue -Item $Item -Name 'description'
+        $cVal = Get-ObjectProperty -Item $Item -Name 'content'
+        $dVal = Get-ObjectProperty -Item $Item -Name 'description'
         if ($null -ne $cVal) { $contentToSearch += (& $getText $cVal) }
         if ($null -ne $dVal) { $contentToSearch += ' ' + (& $getText $dVal) }
         if ($contentToSearch -match 'href="(https?://blog\.0patch\.com/\d{4}/\d{2}/[^"]+\.html)"') {
@@ -276,15 +287,15 @@ function Get-ItemLink {
 
     # any.run special handling
     if ($FeedUrl -match 'any\.run') {
-        $linkVal = Get-ItemPropertyValue -Item $Item -Name 'link'
+        $linkVal = Get-ObjectProperty -Item $Item -Name 'link'
         if ($null -ne $linkVal) { $extractedLink = & $getText $linkVal }
 
         if (-not $extractedLink) {
-            $guidVal = Get-ItemPropertyValue -Item $Item -Name 'guid'
+            $guidVal = Get-ObjectProperty -Item $Item -Name 'guid'
             if ($null -ne $guidVal) { $extractedLink = & $getText $guidVal }
         }
         if (-not $extractedLink) {
-            $idVal = Get-ItemPropertyValue -Item $Item -Name 'id'
+            $idVal = Get-ObjectProperty -Item $Item -Name 'id'
             if ($null -ne $idVal) {
                 $extractedLink = if ($idVal -is [string]) { $idVal } else { (& $getText $idVal) }
             }
@@ -301,8 +312,8 @@ function Get-ItemLink {
         }
 
         $contentToSearch = ''
-        $dVal = Get-ItemPropertyValue -Item $Item -Name 'description'
-        $cVal = Get-ItemPropertyValue -Item $Item -Name 'content'
+        $dVal = Get-ObjectProperty -Item $Item -Name 'description'
+        $cVal = Get-ObjectProperty -Item $Item -Name 'content'
         if ($null -ne $dVal) { $contentToSearch += (& $getText $dVal) }
         if ($null -ne $cVal) { $contentToSearch += ' ' + (& $getText $cVal) }
         if ($contentToSearch -match 'href="(https?://any\.run/[^"]+)"') {
@@ -314,19 +325,19 @@ function Get-ItemLink {
     if ($FeedUrl -match 'reddit\.com') {
         $redditPostLink = $null
 
-        $linkVal = Get-ItemPropertyValue -Item $Item -Name 'link'
+        $linkVal = Get-ObjectProperty -Item $Item -Name 'link'
         $linkStr = if ($linkVal -is [string]) { $linkVal } elseif ($null -ne $linkVal) { (& $getText $linkVal) } else { $null }
         if ($linkStr -match 'reddit\.com/r/[^/]+/comments/') {
             $redditPostLink = $linkStr
         }
         else {
-            $idVal = Get-ItemPropertyValue -Item $Item -Name 'id'
+            $idVal = Get-ObjectProperty -Item $Item -Name 'id'
             $idStr = if ($idVal -is [string]) { $idVal } elseif ($null -ne $idVal) { (& $getText $idVal) } else { $null }
             if ($idStr -match 'reddit\.com/r/[^/]+/comments/') {
                 $redditPostLink = $idStr
             }
             else {
-                $guidVal = Get-ItemPropertyValue -Item $Item -Name 'guid'
+                $guidVal = Get-ObjectProperty -Item $Item -Name 'guid'
                 if ($null -ne $guidVal) {
                     $gv = & $getText $guidVal
                     if ($gv -match 'reddit\.com/r/[^/]+/comments/') { $redditPostLink = $gv }
@@ -336,8 +347,8 @@ function Get-ItemLink {
 
         if (-not $redditPostLink) {
             $contentToSearch = ''
-            $cVal = Get-ItemPropertyValue -Item $Item -Name 'content'
-            $dVal = Get-ItemPropertyValue -Item $Item -Name 'description'
+            $cVal = Get-ObjectProperty -Item $Item -Name 'content'
+            $dVal = Get-ObjectProperty -Item $Item -Name 'description'
             if ($null -ne $cVal) { $contentToSearch += (& $getText $cVal) }
             if ($null -ne $dVal) { $contentToSearch += ' ' + (& $getText $dVal) }
 
@@ -358,7 +369,7 @@ function Get-ItemLink {
     # Standard link extraction
     $linkSources = @('link', 'guid', 'id', 'url', 'feedburner:origLink', 'origLink')
     foreach ($sourceName in $linkSources) {
-        $value = Get-ItemPropertyValue -Item $Item -Name $sourceName
+        $value = Get-ObjectProperty -Item $Item -Name $sourceName
         if ($null -eq $value) { continue }
 
         $candidate = $null
@@ -400,8 +411,8 @@ function Get-ItemLink {
 
     # CISA special handling
     if ((-not $extractedLink -or $extractedLink -eq $FeedUrl) -and $FeedUrl -match 'cisa\.gov') {
-        $idVal = Get-ItemPropertyValue -Item $Item -Name 'id'
-        $guidVal = Get-ItemPropertyValue -Item $Item -Name 'guid'
+        $idVal = Get-ObjectProperty -Item $Item -Name 'id'
+        $guidVal = Get-ObjectProperty -Item $Item -Name 'guid'
         $advisoryId = $null
         if ($null -ne $idVal) {
             $advisoryId = if ($idVal -is [string]) { $idVal } else { (& $getText $idVal) }
@@ -416,7 +427,7 @@ function Get-ItemLink {
 
     # Talos special handling
     if ((-not $extractedLink -or $extractedLink -eq $FeedUrl) -and $FeedUrl -match 'talosintelligence|feedburner/Talos') {
-        $dVal = Get-ItemPropertyValue -Item $Item -Name 'description'
+        $dVal = Get-ObjectProperty -Item $Item -Name 'description'
         if ($null -ne $dVal) {
             $dText = if ($dVal -is [string]) { $dVal } else { (& $getText $dVal) }
             if ($dText -match 'href="(https?://[^"]+)"') {
@@ -506,8 +517,11 @@ function Test-UrlSafety {
             return $false
         }
 
-        # Block common malicious patterns
-        if ($Url -match 'javascript:|data:|file:|ftp:|<script|<iframe|onerror=|onload=') {
+        # Block dangerous schemes (anchored: a query string containing
+        # "data:" must not reject an otherwise valid http(s) URL) and
+        # HTML injection fragments anywhere in the URL.
+        if ($Url -match '^\s*(javascript|data|vbscript|file|ftp):' -or
+            $Url -match '<script|<iframe|onerror=|onload=') {
             Write-Verbose "URL rejected (malicious pattern): $Url"
             return $false
         }
@@ -598,14 +612,23 @@ function ConvertFrom-FeedContent {
         Uses XmlReader with DTD processing ignored, no external resolver,
         and entity/document size limits. Retries once after stripping BOM
         and non-printable control characters.
+
+        Prefer passing -Bytes: XmlReader then detects the document's real
+        encoding from the BOM / XML prolog, which avoids mojibake when the
+        HTTP response was decoded with the wrong charset (a common problem
+        on PowerShell 5.1 when servers omit charset in Content-Type).
     .OUTPUTS
         PSCustomObject with Items (XmlElement[]) and Error (string or $null).
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName = 'Text')]
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Text')]
         [AllowEmptyString()]
-        [string]$Content
+        [string]$Content,
+
+        [Parameter(Mandatory, ParameterSetName = 'Bytes')]
+        [AllowEmptyCollection()]
+        [byte[]]$Bytes
     )
 
     $result = [PSCustomObject]@{
@@ -613,30 +636,62 @@ function ConvertFrom-FeedContent {
         Error = $null
     }
 
-    if ([string]::IsNullOrWhiteSpace($Content)) {
-        $result.Error = 'Empty content'
-        return $result
+    $useBytes = $PSCmdlet.ParameterSetName -eq 'Bytes'
+
+    if ($useBytes) {
+        if ($null -eq $Bytes -or $Bytes.Length -eq 0) {
+            $result.Error = 'Empty content'
+            return $result
+        }
+        # Sniff the head for HTML masquerading as a feed (lenient UTF-8
+        # decode is fine here: '<html'/'<!doctype' are ASCII).
+        $sniffLen = [Math]::Min(512, $Bytes.Length)
+        $head = [System.Text.Encoding]::UTF8.GetString($Bytes, 0, $sniffLen)
+        if (($head -replace "^\uFEFF", '').TrimStart() -match '^<(html|!doctype)') {
+            $result.Error = 'Feed returned HTML instead of XML (URL may point to a webpage)'
+            return $result
+        }
+    }
+    else {
+        if ([string]::IsNullOrWhiteSpace($Content)) {
+            $result.Error = 'Empty content'
+            return $result
+        }
+
+        # Detect HTML pages masquerading as feeds (clear error instead of a cryptic XML parse failure)
+        if ($Content.TrimStart() -match '^<(html|!doctype)') {
+            $result.Error = 'Feed returned HTML instead of XML (URL may point to a webpage)'
+            return $result
+        }
     }
 
-    # Detect HTML pages masquerading as feeds (clear error instead of a cryptic XML parse failure)
-    if ($Content.TrimStart() -match '^<(html|!doctype)') {
-        $result.Error = 'Feed returned HTML instead of XML (URL may point to a webpage)'
-        return $result
-    }
-
-    $parse = {
-        param([string]$XmlText)
+    $newSettings = {
         $settings = [System.Xml.XmlReaderSettings]::new()
         $settings.DtdProcessing = [System.Xml.DtdProcessing]::Ignore
         $settings.XmlResolver = $null
         $settings.MaxCharactersFromEntities = 10240
         $settings.MaxCharactersInDocument = 52428800
         $settings.IgnoreWhitespace = $true
+        return $settings
+    }
 
+    $parse = {
+        param([string]$XmlText)
         $reader = [System.Xml.XmlReader]::Create(
             [System.IO.StringReader]::new($XmlText),
-            $settings
+            (& $newSettings)
         )
+        $doc = [System.Xml.XmlDocument]::new()
+        $doc.XmlResolver = $null
+        $doc.Load($reader)
+        $reader.Dispose()
+        return $doc
+    }
+
+    $parseStream = {
+        param([System.IO.Stream]$Stream)
+        # XmlReader over a raw stream auto-detects encoding (BOM/prolog).
+        $reader = [System.Xml.XmlReader]::Create($Stream, (& $newSettings))
         $doc = [System.Xml.XmlDocument]::new()
         $doc.XmlResolver = $null
         $doc.Load($reader)
@@ -654,17 +709,39 @@ function ConvertFrom-FeedContent {
     }
 
     $doc = $null
-    try {
-        $doc = & $parse $Content
-    }
-    catch {
+    if ($useBytes) {
         try {
-            $cleaned = $Content -replace "^\uFEFF", '' -replace '[\x00-\x08\x0B\x0C\x0E-\x1F]', ''
-            $doc = & $parse $cleaned
+            $ms = [System.IO.MemoryStream]::new($Bytes)
+            try { $doc = & $parseStream $ms }
+            finally { $ms.Dispose() }
         }
         catch {
-            $result.Error = "XML parse error: $($_.Exception.Message)"
-            return $result
+            # Fall back: decode as UTF-8, strip BOM and control characters,
+            # and retry via the text path.
+            try {
+                $text = [System.Text.Encoding]::UTF8.GetString($Bytes)
+                $cleaned = $text -replace "^\uFEFF", '' -replace '[\x00-\x08\x0B\x0C\x0E-\x1F]', ''
+                $doc = & $parse $cleaned
+            }
+            catch {
+                $result.Error = "XML parse error: $($_.Exception.Message)"
+                return $result
+            }
+        }
+    }
+    else {
+        try {
+            $doc = & $parse $Content
+        }
+        catch {
+            try {
+                $cleaned = $Content -replace "^\uFEFF", '' -replace '[\x00-\x08\x0B\x0C\x0E-\x1F]', ''
+                $doc = & $parse $cleaned
+            }
+            catch {
+                $result.Error = "XML parse error: $($_.Exception.Message)"
+                return $result
+            }
         }
     }
 
@@ -755,6 +832,7 @@ function Merge-ConfigDefaults {
         NvdCacheHours             = 6
         NvdKeywordFilter          = $false
         MinHostRequestIntervalMs  = 250
+        HostRequestIntervalMsOverrides = [PSCustomObject]@{}
         GlobalTimeoutSeconds      = 900
         StateRetentionDays        = 90
         StateMaxEntries           = 20000
@@ -859,6 +937,15 @@ function Test-Configuration {
         throw "LogLevel must be one of: Debug, Info, Warning, Error"
     }
 
+    if ($s.PSObject.Properties['HostRequestIntervalMsOverrides'] -and $null -ne $s.HostRequestIntervalMsOverrides) {
+        foreach ($ov in $s.HostRequestIntervalMsOverrides.PSObject.Properties) {
+            $ovInt = 0
+            if (-not [int]::TryParse([string]$ov.Value, [ref]$ovInt) -or $ovInt -lt 0) {
+                throw "HostRequestIntervalMsOverrides['$($ov.Name)'] must be a non-negative integer (milliseconds)"
+            }
+        }
+    }
+
     if ($Config.PSObject.Properties['SchemaVersion'] -and $Config.SchemaVersion -gt 1) {
         Write-Warning "Config SchemaVersion $($Config.SchemaVersion) is newer than supported (1); some settings may be ignored"
     }
@@ -893,6 +980,31 @@ function Initialize-Configuration {
     }
 }
 
+function Get-FeedStatusLabel {
+    <#
+    .SYNOPSIS
+        Classifies a feed's health from its success/failure counters.
+    .DESCRIPTION
+        Single source of truth for feed status so the console summary,
+        the exported health report and the HTML report always agree:
+        unhealthy = failed and never succeeded this run,
+        degraded  = succeeded but with more than 2 failures,
+        healthy   = everything else.
+    .OUTPUTS
+        [string] 'healthy', 'degraded' or 'unhealthy'.
+    #>
+    [CmdletBinding()]
+    param(
+        [int]$SuccessCount = 0,
+
+        [int]$FailureCount = 0
+    )
+
+    if ($FailureCount -gt 0 -and $SuccessCount -eq 0) { return 'unhealthy' }
+    if ($FailureCount -gt 2) { return 'degraded' }
+    return 'healthy'
+}
+
 function Get-FeedHealthReport {
     <#
     .SYNOPSIS
@@ -917,30 +1029,20 @@ function Get-FeedHealthReport {
         $totalSuccess += $health.SuccessCount
         $totalFailures += $health.FailureCount
 
-        if ($health.FailureCount -gt 0 -and $health.SuccessCount -eq 0) {
-            $unhealthy++
-            $unhealthyList.Add([PSCustomObject]@{
-                Feed        = $entry.Key
-                Host        = $health.Host
-                Status      = 'UNHEALTHY'
-                Failures    = $health.FailureCount
-                LastError   = $health.LastError
-                LastChecked = $health.LastChecked
-            })
-        }
-        elseif ($health.FailureCount -gt 2) {
-            $degraded++
-            $unhealthyList.Add([PSCustomObject]@{
-                Feed        = $entry.Key
-                Host        = $health.Host
-                Status      = 'DEGRADED'
-                Failures    = $health.FailureCount
-                LastError   = $health.LastError
-                LastChecked = $health.LastChecked
-            })
+        $label = Get-FeedStatusLabel -SuccessCount $health.SuccessCount -FailureCount $health.FailureCount
+        if ($label -eq 'healthy') {
+            $healthy++
         }
         else {
-            $healthy++
+            if ($label -eq 'unhealthy') { $unhealthy++ } else { $degraded++ }
+            $unhealthyList.Add([PSCustomObject]@{
+                Feed        = $entry.Key
+                Host        = $health.Host
+                Status      = $label.ToUpperInvariant()
+                Failures    = $health.FailureCount
+                LastError   = $health.LastError
+                LastChecked = $health.LastChecked
+            })
         }
     }
 
@@ -1021,10 +1123,23 @@ function Save-RunConfiguration {
         [string]$StatePath = ''
     )
 
+    # Copy settings with secrets redacted: the snapshot lands in the output
+    # directory, which may be shared more widely than config.json.
+    $secretKeys = @('NvdApiKey', 'WebhookUrl')
+    $settingsCopy = [ordered]@{}
+    foreach ($p in $Config.Settings.PSObject.Properties) {
+        if ($p.Name -in $secretKeys -and -not [string]::IsNullOrEmpty([string]$p.Value)) {
+            $settingsCopy[$p.Name] = '***REDACTED***'
+        }
+        else {
+            $settingsCopy[$p.Name] = $p.Value
+        }
+    }
+
     $runConfig = [PSCustomObject]@{
         Timestamp           = Get-Date
         SchemaVersion       = $Config.SchemaVersion
-        Settings            = $Config.Settings
+        Settings            = [PSCustomObject]$settingsCopy
         FeedCount           = @($Config.Feeds).Count
         KeywordCount        = @($Config.Keywords).Count
         MitreTechniqueCount = $Config.MitreKeywords.PSObject.Properties.Name.Count
@@ -1146,12 +1261,35 @@ function Save-ThreatRavenState {
 
     $State.UpdatedAt = $now.ToString('o')
 
+    if (-not [System.IO.Path]::IsPathRooted($Path)) {
+        $Path = Join-Path (Get-Location).Path $Path
+    }
+
     $dir = Split-Path -Parent $Path
     if (-not [string]::IsNullOrWhiteSpace($dir) -and -not (Test-Path -LiteralPath $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
 
-    $State | ConvertTo-Json -Depth 10 | Out-File -LiteralPath $Path -Encoding UTF8
+    # Atomic save: write to a temp file, then swap it into place so a crash
+    # mid-write can never corrupt the state file. File.Replace also keeps a
+    # .bak copy of the last good state.
+    $json = $State | ConvertTo-Json -Depth 10
+    $tmpPath = "$Path.tmp"
+    [System.IO.File]::WriteAllText($tmpPath, $json, [System.Text.UTF8Encoding]::new($false))
+
+    if (Test-Path -LiteralPath $Path) {
+        try {
+            [System.IO.File]::Replace($tmpPath, $Path, "$Path.bak")
+        }
+        catch {
+            # File.Replace can fail across volumes or on exotic filesystems;
+            # fall back to a plain move (still a single-rename swap).
+            Move-Item -LiteralPath $tmpPath -Destination $Path -Force
+        }
+    }
+    else {
+        Move-Item -LiteralPath $tmpPath -Destination $Path -Force
+    }
 }
 
 function Get-ThreatRavenHistoryItems {
@@ -1211,7 +1349,14 @@ function Get-NvdCves {
 
     if ($null -ne $State -and $null -ne $State.NvdCache) {
         $cached = $State.NvdCache
-        if ($cached.PSObject.Properties['Days'] -and $cached.Days -eq $Days -and $cached.PSObject.Properties['FetchedAt']) {
+        # The cache is only valid when the parameters that shaped it are
+        # unchanged; a cache from an older schema (missing these fields)
+        # is treated as stale.
+        $sameShape = $cached.PSObject.Properties['Days'] -and $cached.Days -eq $Days -and
+            $cached.PSObject.Properties['FetchedAt'] -and
+            $cached.PSObject.Properties['KeywordFilter'] -and ([bool]$cached.KeywordFilter) -eq $KeywordFilter -and
+            $cached.PSObject.Properties['MaxResults'] -and ([int]$cached.MaxResults) -eq $MaxResults
+        if ($sameShape) {
             $age = ((Get-Date) - (ConvertTo-DateTime -InputObject ([string]$cached.FetchedAt) -Fallback ([DateTime]::MinValue))).TotalHours
             if ($age -ge 0 -and $age -lt $CacheHours) {
                 Write-Verbose "Using cached NVD data (${age} hours old)"
@@ -1234,7 +1379,7 @@ function Get-NvdCves {
     do {
         $url = "https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=$startStr&pubEndDate=$endStr&startIndex=$startIndex&resultsPerPage=$pageSize"
         $headers = @{
-            'User-Agent' = 'ThreatRaven/4.0 (APT Intelligence Feed Monitor)'
+            'User-Agent' = 'ThreatRaven/4.1 (APT Intelligence Feed Monitor)'
         }
         if ($ApiKey) { $headers['apiKey'] = $ApiKey }
 
@@ -1305,15 +1450,15 @@ function Get-NvdCves {
         $mappedCount++
 
         $cve = $v.cve
-        $metrics = Get-ItemPropertyValue -Item $cve -Name 'metrics'
+        $metrics = Get-ObjectProperty -Item $cve -Name 'metrics'
 
         $severity = 'UNKNOWN'
         $score = 0.0
 
         if ($null -ne $metrics) {
-            $m31 = Get-ItemPropertyValue -Item $metrics -Name 'cvssMetricV31'
-            $m3 = Get-ItemPropertyValue -Item $metrics -Name 'cvssMetricV3'
-            $m2 = Get-ItemPropertyValue -Item $metrics -Name 'cvssMetricV2'
+            $m31 = Get-ObjectProperty -Item $metrics -Name 'cvssMetricV31'
+            $m3 = Get-ObjectProperty -Item $metrics -Name 'cvssMetricV3'
+            $m2 = Get-ObjectProperty -Item $metrics -Name 'cvssMetricV2'
 
             if ($null -ne $m31 -and @($m31).Count -gt 0) {
                 $severity = [string]$m31[0].cvssData.baseSeverity
@@ -1330,7 +1475,7 @@ function Get-NvdCves {
         }
 
         $desc = ''
-        $descriptions = Get-ItemPropertyValue -Item $cve -Name 'descriptions'
+        $descriptions = Get-ObjectProperty -Item $cve -Name 'descriptions'
         if ($null -ne $descriptions) {
             foreach ($d in $descriptions) {
                 if ($d.PSObject.Properties['lang'] -and [string]$d.lang -eq 'en') {
@@ -1358,10 +1503,12 @@ function Get-NvdCves {
     }
 
     $result = [PSCustomObject]@{
-        FetchedAt = (Get-Date).ToString('o')
-        Days      = $Days
-        Truncated = $truncated
-        Cves      = $mapped
+        FetchedAt     = (Get-Date).ToString('o')
+        Days          = $Days
+        KeywordFilter = $KeywordFilter
+        MaxResults    = $MaxResults
+        Truncated     = $truncated
+        Cves          = $mapped
     }
 
     if ($null -ne $State) {
@@ -1420,6 +1567,7 @@ Export-ModuleMember -Function @(
     'Merge-ConfigDefaults',
     'Test-Configuration',
     'Initialize-Configuration',
+    'Get-FeedStatusLabel',
     'Get-FeedHealthReport',
     'Export-FeedHealthReport',
     'Save-RunConfiguration',

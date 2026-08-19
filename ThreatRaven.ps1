@@ -1,6 +1,20 @@
 # ============================================================
 # ThreatRaven.ps1 - APT Intelligence Feed Monitor
-# Version: 4.0
+# Version: 4.1
+#
+# v4.1 changes:
+#  - Fixed inverted feed-health status in the HTML report (now shares
+#    Get-FeedStatusLabel with the console/exported health summary)
+#  - Feeds parsed from raw response bytes: correct handling of non-UTF-8
+#    and missing-charset responses on PowerShell 5.1 (no more mojibake)
+#  - Retry loop: response object reset per attempt (no stale ETag/Retry-After),
+#    500ms pause between user-agent fallbacks (no rapid-fire bursts)
+#  - Certificate bypass (ValidateCertificates=false) now uses a compiled
+#    callback: scriptblock delegates crash on runspace-less threads
+#  - State file: atomic save (temp + swap, .bak kept) and a lock file so
+#    concurrent runs can't corrupt each other's state
+#  - Removed misleading SupportsShouldProcess (-WhatIf only guarded the
+#    browser-open step while every write still happened)
 #
 # v4.0 changes:
 #  - Fixed stored-XSS in generated reports (DOM-based rendering,
@@ -61,7 +75,7 @@
     .\ThreatRaven.ps1 -NonInteractive -NoOpenReport -QuietMode
 #>
 
-[CmdletBinding(SupportsShouldProcess = $true)]
+[CmdletBinding()]
 param(
     [string]$ConfigPath = "",
     [string]$PreviousCsvPath,
@@ -95,7 +109,7 @@ if ([string]::IsNullOrWhiteSpace($StatePath))  { $StatePath = Join-Path $PSScrip
 # ============================================================
 # CONSTANTS
 # ============================================================
-$script:SCRIPT_VERSION = '4.0'
+$script:SCRIPT_VERSION = '4.1'
 $script:SECONDS_PER_DAY = 86400
 $script:DEFAULT_MITRE_INITIAL_SHOW = 5
 $script:DEFAULT_KEYWORD_TOP_N = 10
@@ -202,6 +216,14 @@ function Write-ProgressIfNotQuiet {
 # ============================================================
 # MAIN SCRIPT
 # ============================================================
+# Initialized up front so the catch/finally paths can safely reference them
+# under strict mode even when a failure happens early in the run.
+$script:StateLockStream = $null
+$script:StateLockPath = $null
+$script:RunspacePoolOpen = $false
+$script:State = $null
+$script:FeedHealth = $null
+
 try {
     Write-Log "=== ThreatRaven v$script:SCRIPT_VERSION ===" -Level Info
     Write-Log "by Diyar Abbas | diyar.jaafar@gmail.com | github.com/diyarit" -Level Info
@@ -225,6 +247,19 @@ try {
     $script:NvdCacheHours             = [int]$Settings.NvdCacheHours
     $script:NvdKeywordFilter          = [bool]$Settings.NvdKeywordFilter
     $script:MinHostRequestIntervalMs  = [int]$Settings.MinHostRequestIntervalMs
+
+    # Per-host pacing overrides (e.g. reddit.com needs several seconds between
+    # requests). Keys match the host exactly or as a parent-domain suffix.
+    $script:HostIntervalOverrides = @{}
+    if ($Settings.PSObject.Properties['HostRequestIntervalMsOverrides'] -and $null -ne $Settings.HostRequestIntervalMsOverrides) {
+        $ovSetting = $Settings.HostRequestIntervalMsOverrides
+        if ($ovSetting -is [hashtable]) {
+            foreach ($k in $ovSetting.Keys) { $script:HostIntervalOverrides[[string]$k] = [int]$ovSetting[$k] }
+        }
+        else {
+            foreach ($p in $ovSetting.PSObject.Properties) { $script:HostIntervalOverrides[[string]$p.Name] = [int]$p.Value }
+        }
+    }
     $script:GlobalTimeoutSeconds      = [int]$Settings.GlobalTimeoutSeconds
     $script:StateRetentionDays        = [int]$Settings.StateRetentionDays
     $script:StateMaxEntries           = [int]$Settings.StateMaxEntries
@@ -244,22 +279,69 @@ try {
             Remove-Item -Force -ErrorAction SilentlyContinue
     }
 
-    # Certificate validation: set once for the whole run (ServicePointManager is process-global)
+    # Certificate validation: set once for the whole run (ServicePointManager is process-global).
+    # The bypass must be a COMPILED delegate: a PowerShell scriptblock callback is invoked on
+    # .NET threadpool threads that have no runspace and crashes intermittently under parallel load.
     if ($script:ValidateCertificates) {
         [System.Net.ServicePointManager]::ServerCertificateValidationCallback = $null
     }
     else {
-        [System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+        Write-Log "TLS certificate validation is DISABLED (ValidateCertificates=false). Feeds are exposed to man-in-the-middle tampering." -Level Warning
+        if (-not ('ThreatRaven.CertPolicy' -as [type])) {
+            Add-Type -TypeDefinition @"
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+
+namespace ThreatRaven
+{
+    public static class CertPolicy
+    {
+        public static bool AcceptAll(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+            return true;
+        }
+
+        public static void Enable()
+        {
+            ServicePointManager.ServerCertificateValidationCallback = new RemoteCertificateValidationCallback(AcceptAll);
+        }
+    }
+}
+"@
+        }
+        [ThreatRaven.CertPolicy]::Enable()
     }
 
     # ============================================================
     # PERSISTENT STATE
     # ============================================================
+    # Hold an exclusive lock for the whole run so two concurrent instances
+    # can't read and rewrite the same state file over each other.
+    $stateDir = Split-Path -Parent $StatePath
+    if (-not [string]::IsNullOrWhiteSpace($stateDir) -and -not (Test-Path -LiteralPath $stateDir)) {
+        New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+    }
+    $script:StateLockPath = "$StatePath.lock"
+    try {
+        $script:StateLockStream = [System.IO.File]::Open(
+            $script:StateLockPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None)
+    }
+    catch {
+        throw "Could not acquire the state lock ($script:StateLockPath) - another ThreatRaven instance is likely running. If you are sure none is, delete the lock file. ($($_.Exception.Message))"
+    }
+
     $script:State = Initialize-ThreatRavenState -Path $StatePath `
         -RetentionDays $script:StateRetentionDays -MaxEntries $script:StateMaxEntries
     Write-Log "State loaded: $($script:State.Items.Count) known links" -Level Debug
 
     $ExistingLinks = [System.Collections.Concurrent.ConcurrentDictionary[string,bool]]::new([StringComparer]::OrdinalIgnoreCase)
+    # Shared per-host request gate: maps gate key -> earliest allowed next
+    # request (ticks). Workers claim slots atomically at request time.
+    $script:HostGate = [System.Collections.Concurrent.ConcurrentDictionary[string,long]]::new([StringComparer]::OrdinalIgnoreCase)
     $StateSeenBefore = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 
     if (-not $SkipDeduplication) {
@@ -309,12 +391,12 @@ try {
     $script:rxOpts = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor
                      [System.Text.RegularExpressions.RegexOptions]::Compiled
 
-    $script:CompiledKeywords = $config.Keywords | ForEach-Object {
+    $script:CompiledKeywords = @($config.Keywords | ForEach-Object {
         [System.Text.RegularExpressions.Regex]::new(
             "\b" + [System.Text.RegularExpressions.Regex]::Escape($_) + "\b",
             $script:rxOpts
         )
-    }
+    })
 
     $script:CompiledMitre = @{}
     foreach ($tid in $config.MitreKeywords.PSObject.Properties.Name) {
@@ -429,7 +511,10 @@ try {
             [string[]]$UserAgentList,
             [string]$ModulePath,
             [hashtable]$FeedCache,
-            [bool]$UseConditionalRequests
+            [bool]$UseConditionalRequests,
+            $HostGateRef,
+            [string]$HostGateKey,
+            [int]$HostIntervalMs
         )
 
         Set-StrictMode -Version Latest
@@ -440,11 +525,11 @@ try {
         $localRxOpts = [System.Text.RegularExpressions.RegexOptions]::IgnoreCase -bor
                        [System.Text.RegularExpressions.RegexOptions]::Compiled
 
-        $localKwRegex = $KeywordList | ForEach-Object {
+        $localKwRegex = @($KeywordList | ForEach-Object {
             [System.Text.RegularExpressions.Regex]::new(
                 "\b" + [System.Text.RegularExpressions.Regex]::Escape($_) + "\b", $localRxOpts
             )
-        }
+        })
         $kwNames = $KeywordList
 
         $localMitreRegex = @{}
@@ -475,7 +560,13 @@ try {
 
         while ($attempt -lt $maxAttempts -and -not $fetchSuccess -and -not $permanentError) {
             $attempt++
+            $uaIndex = 0
             foreach ($agent in $UserAgentList) {
+                $uaIndex++
+                # Pause between user-agent fallbacks so a transient server
+                # error doesn't trigger a rapid-fire burst of requests.
+                if ($uaIndex -gt 1) { Start-Sleep -Milliseconds 500 }
+
                 $headers = @{
                     "User-Agent"      = $agent
                     "Accept"          = "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"
@@ -496,8 +587,12 @@ try {
                     }
                 }
 
+                # Reset per attempt: a stale response object from a previous
+                # attempt must never supply ETag/Retry-After headers.
                 $statusCode = 0
                 $errMsg = ''
+                $webRequest = $null
+                $resp = $null
                 $iwrParams = @{
                     Uri            = $Url
                     TimeoutSec     = $TimeoutSeconds
@@ -506,6 +601,26 @@ try {
                 }
                 if ($PSVersionTable.PSVersion.Major -ge 7) {
                     $iwrParams['SkipHttpErrorCheck'] = $true
+                }
+
+                # Per-host request gate, enforced at request time across all
+                # workers (dispatch-time pacing alone can't help once runspaces
+                # queue behind busy workers and then fire in a burst). Each
+                # request - including retries - atomically claims the next
+                # time slot for its host.
+                if ($HostIntervalMs -gt 0 -and $null -ne $HostGateRef -and $HostGateKey) {
+                    $intervalTicks = [long]$HostIntervalMs * 10000
+                    while ($true) {
+                        $nowTicks = [DateTime]::UtcNow.Ticks
+                        $nextAllowed = $HostGateRef.GetOrAdd($HostGateKey, [long]0)
+                        if ($nowTicks -ge $nextAllowed) {
+                            if ($HostGateRef.TryUpdate($HostGateKey, $nowTicks + $intervalTicks, $nextAllowed)) { break }
+                        }
+                        else {
+                            $waitMs = [int][Math]::Min(1000, (($nextAllowed - $nowTicks) / 10000) + 10)
+                            Start-Sleep -Milliseconds ([Math]::Max(10, $waitMs))
+                        }
+                    }
                 }
 
                 try {
@@ -633,8 +748,23 @@ try {
             catch { }
         }
 
-        # Secure XML parsing (module handles DTD/size hardening and cleanup)
-        $parsed = ConvertFrom-FeedContent -Content $webRequest.Content
+        # Secure XML parsing (module handles DTD/size hardening and cleanup).
+        # Prefer raw bytes: $webRequest.Content on PS 5.1 is decoded as
+        # ISO-8859-1 when the server omits charset, garbling non-ASCII text.
+        # From bytes, XmlReader detects the real encoding (BOM/XML prolog).
+        $rawBytes = $null
+        try {
+            $rcs = $webRequest.RawContentStream
+            if ($null -ne $rcs) { $rawBytes = $rcs.ToArray() }
+        }
+        catch { }
+
+        $parsed = if ($null -ne $rawBytes -and $rawBytes.Length -gt 0) {
+            ConvertFrom-FeedContent -Bytes $rawBytes
+        }
+        else {
+            ConvertFrom-FeedContent -Content $webRequest.Content
+        }
         if ($parsed.Error) {
             $errorResult.Error = $parsed.Error
             return $errorResult
@@ -719,7 +849,26 @@ try {
     $CurrentFeed = 0
     $script:LastHostDispatch = @{}
 
-    foreach ($url in $config.Feeds) {
+    # Dispatch order: first occurrence of each host first, then second
+    # occurrences, and so on. Repeat-host feeds land at the end, so per-host
+    # pacing sleeps (e.g. 7s between reddit.com requests) never hold up the
+    # dispatch of unrelated feeds.
+    $hostOccurrence = @{}
+    $feedBuckets = [System.Collections.Generic.SortedDictionary[int, System.Collections.Generic.List[string]]]::new()
+    foreach ($u in $config.Feeds) {
+        $h = try { ([System.Uri]$u).Host } catch { '' }
+        $occ = 0
+        if ($hostOccurrence.ContainsKey($h)) { $occ = $hostOccurrence[$h] }
+        $hostOccurrence[$h] = $occ + 1
+        if (-not $feedBuckets.ContainsKey($occ)) {
+            $feedBuckets[$occ] = [System.Collections.Generic.List[string]]::new()
+        }
+        $feedBuckets[$occ].Add($u)
+    }
+    $DispatchFeeds = [System.Collections.Generic.List[string]]::new()
+    foreach ($bucket in $feedBuckets.Values) { $DispatchFeeds.AddRange($bucket) }
+
+    foreach ($url in $DispatchFeeds) {
         $CurrentFeed++
 
         if (-not (Test-UrlSafety -Url $url -AllowedPatterns $config.AllowedUrlPatterns)) {
@@ -728,13 +877,23 @@ try {
         }
 
         # Per-host request pacing (helps avoid rate limiting from the same domain)
-        if ($script:MinHostRequestIntervalMs -gt 0) {
-            $hostKey = ([System.Uri]$url).Host
+        $hostKey = ([System.Uri]$url).Host
+        $gateKey = $hostKey
+        $intervalMs = $script:MinHostRequestIntervalMs
+        foreach ($ovHost in $script:HostIntervalOverrides.Keys) {
+            if (($hostKey -eq $ovHost -or $hostKey.EndsWith('.' + $ovHost, [StringComparison]::OrdinalIgnoreCase)) -and
+                $script:HostIntervalOverrides[$ovHost] -gt $intervalMs) {
+                $intervalMs = $script:HostIntervalOverrides[$ovHost]
+                # Gate on the override's domain so www./old. subdomains share one gate
+                $gateKey = $ovHost
+            }
+        }
+        if ($intervalMs -gt 0) {
             $lastDispatch = $script:LastHostDispatch[$hostKey]
             if ($null -ne $lastDispatch) {
                 $elapsedMs = ([DateTime]::UtcNow - $lastDispatch).TotalMilliseconds
-                if ($elapsedMs -lt $script:MinHostRequestIntervalMs) {
-                    Start-Sleep -Milliseconds ($script:MinHostRequestIntervalMs - $elapsedMs)
+                if ($elapsedMs -lt $intervalMs) {
+                    Start-Sleep -Milliseconds ($intervalMs - $elapsedMs)
                 }
             }
             $script:LastHostDispatch[$hostKey] = [DateTime]::UtcNow
@@ -763,6 +922,9 @@ try {
             ModulePath              = $script:ModulePath
             FeedCache               = $feedCacheEntry
             UseConditionalRequests  = $script:EnableConditionalRequests
+            HostGateRef             = $script:HostGate
+            HostGateKey             = $gateKey
+            HostIntervalMs          = $intervalMs
         })
 
         $handle = $ps.BeginInvoke()
@@ -1123,9 +1285,7 @@ try {
     foreach ($entry in $script:FeedHealth.GetEnumerator()) {
         if (-not $firstHealth) { $healthParts.Append(',') | Out-Null }
         $hHost = ConvertTo-JavaScriptString -Text $entry.Value.Host
-        $hStatus = if ($entry.Value.FailureCount -eq 0) { "healthy" }
-                   elseif ($entry.Value.FailureCount -gt 2) { "degraded" }
-                   else { "unhealthy" }
+        $hStatus = Get-FeedStatusLabel -SuccessCount $entry.Value.SuccessCount -FailureCount $entry.Value.FailureCount
         $hLastErr = ConvertTo-JavaScriptString -Text $entry.Value.LastError
         $hLastChecked = if ($entry.Value.LastChecked) { $entry.Value.LastChecked.ToString('yyyy-MM-dd HH:mm') } else { "" }
         $null = $healthParts.Append("{host:`"$hHost`",status:`"$hStatus`",ok:$($entry.Value.SuccessCount),fail:$($entry.Value.FailureCount),items:$($entry.Value.TotalItems),matches:$($entry.Value.TotalMatches),err:`"$hLastErr`",checked:`"$hLastChecked`"}")
@@ -1144,6 +1304,28 @@ try {
         throw "Report template not found at: $templatePath"
     }
     $template = Get-Content -LiteralPath $templatePath -Raw -Encoding UTF8
+
+    # Inline Chart.js and the logo so the report is a single self-contained
+    # file that renders anywhere (emailed, moved, archived) with no lib/ or
+    # assets/ folder next to it.
+    $chartLibInlined = $false
+    $chartLibPath = Join-Path $PSScriptRoot "lib\chart.min.js"
+    $chartScriptTag = "<script src='lib/chart.min.js' nonce='{{CSP_NONCE}}'></script>"
+    if ((Test-Path -LiteralPath $chartLibPath) -and $template.Contains($chartScriptTag)) {
+        $chartLibJs = Get-Content -LiteralPath $chartLibPath -Raw -Encoding UTF8
+        if ($chartLibJs -notmatch '</script') {
+            $template = $template.Replace($chartScriptTag, "<script nonce='{{CSP_NONCE}}'>`n$chartLibJs`n</script>")
+            $chartLibInlined = $true
+        }
+    }
+
+    $logoInlined = $false
+    $logoPath = Join-Path $PSScriptRoot "assets\logo.png"
+    if ((Test-Path -LiteralPath $logoPath) -and $template.Contains('src="assets/logo.png"')) {
+        $logoB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($logoPath))
+        $template = $template.Replace('src="assets/logo.png"', "src=`"data:image/png;base64,$logoB64`"")
+        $logoInlined = $true
+    }
 
     $nonceChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
     $cspNonce = -join (1..32 | ForEach-Object { $nonceChars[(Get-Random -Maximum $nonceChars.Length)] })
@@ -1169,20 +1351,23 @@ try {
 
     [System.IO.File]::WriteAllText($HtmlPath, $HtmlContent, [System.Text.UTF8Encoding]::new($false))
 
-    # Copy local Chart.js library alongside report
-    $libSource = Join-Path $PSScriptRoot "lib"
-    $libDest = Join-Path $OutputDir "lib"
-    if ((Test-Path -LiteralPath $libSource) -and $OutputDir -ne $PSScriptRoot) {
-        if (-not (Test-Path -LiteralPath $libDest)) { New-Item -ItemType Directory -Path $libDest -Force | Out-Null }
-        Copy-Item (Join-Path $libSource "chart.min.js") $libDest -Force
+    # Fallback only: when inlining wasn't possible, copy the assets so the
+    # report's relative references still resolve next to it.
+    if (-not $chartLibInlined) {
+        $libSource = Join-Path $PSScriptRoot "lib"
+        $libDest = Join-Path $OutputDir "lib"
+        if ((Test-Path -LiteralPath $libSource) -and $OutputDir -ne $PSScriptRoot) {
+            if (-not (Test-Path -LiteralPath $libDest)) { New-Item -ItemType Directory -Path $libDest -Force | Out-Null }
+            Copy-Item (Join-Path $libSource "chart.min.js") $libDest -Force
+        }
     }
-
-    # Copy logo alongside report
-    $logoSrc = Join-Path $PSScriptRoot "assets\logo.png"
-    $logoDestDir = Join-Path $OutputDir "assets"
-    if ((Test-Path -LiteralPath $logoSrc) -and $OutputDir -ne $PSScriptRoot) {
-        if (-not (Test-Path -LiteralPath $logoDestDir)) { New-Item -ItemType Directory -Path $logoDestDir -Force | Out-Null }
-        Copy-Item $logoSrc $logoDestDir -Force
+    if (-not $logoInlined) {
+        $logoSrc = Join-Path $PSScriptRoot "assets\logo.png"
+        $logoDestDir = Join-Path $OutputDir "assets"
+        if ((Test-Path -LiteralPath $logoSrc) -and $OutputDir -ne $PSScriptRoot) {
+            if (-not (Test-Path -LiteralPath $logoDestDir)) { New-Item -ItemType Directory -Path $logoDestDir -Force | Out-Null }
+            Copy-Item $logoSrc $logoDestDir -Force
+        }
     }
 
     # ============================================================
@@ -1229,9 +1414,7 @@ try {
     Write-Console "  Processing Time:    $([math]::Round($TotalDuration, 2))s" -ForegroundColor Cyan
     if (-not $NoOpenReport) {
         Write-Console "`nOpening HTML report..." -ForegroundColor Yellow
-        if ($PSCmdlet.ShouldProcess($HtmlPath, 'Open HTML report in default browser')) {
-            Start-Process $HtmlPath
-        }
+        Start-Process $HtmlPath
     }
     else {
         Write-Console "`nHTML report ready: $HtmlPath" -ForegroundColor Yellow
@@ -1259,4 +1442,13 @@ catch {
         catch { }
     }
     throw
+}
+finally {
+    if ($null -ne $script:StateLockStream) {
+        try { $script:StateLockStream.Dispose() } catch { }
+        $script:StateLockStream = $null
+        if ($script:StateLockPath) {
+            Remove-Item -LiteralPath $script:StateLockPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 }

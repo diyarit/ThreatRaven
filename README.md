@@ -1,6 +1,6 @@
 # ThreatRaven
 
-APT Intelligence Feed Monitor - fetches, matches, and reports on threat intelligence from 76+ cybersecurity RSS feeds.
+APT Intelligence Feed Monitor - fetches, matches, and reports on threat intelligence from 75+ cybersecurity RSS feeds.
 
 ![ThreatRaven Dashboard](assets/screenshot.png)
 
@@ -8,10 +8,13 @@ APT Intelligence Feed Monitor - fetches, matches, and reports on threat intellig
 
 ThreatRaven monitors RSS/Atom feeds from security vendors, research labs, and threat intel sources. It matches incoming articles against configurable keywords and MITRE ATT&CK techniques, then generates an interactive HTML dashboard and CSV export.
 
-**Core capabilities (v4):**
+**Core capabilities (v4.1):**
 
 - Parallel feed fetching with retry logic, per-host pacing, and a global deadline
-- Rate-limit aware: honors `Retry-After` headers with extra backoff attempts for 429s
+- Rate-limit aware: honors `Retry-After` headers with extra backoff attempts for 429s, plus a request-time gate that strictly spaces requests to rate-limited hosts (configurable per domain, e.g. reddit.com)
+- Self-contained HTML reports: Chart.js and the logo are inlined at generation, so a report renders anywhere - emailed, moved, or archived - with no sidecar files
+- Correct handling of non-UTF-8 feeds: XML is parsed from raw response bytes so the document's real encoding wins even when servers omit charset (a PowerShell 5.1 pitfall)
+- Crash-safe state: atomic saves (temp + swap with a `.bak` of the last good state) and a lock file that prevents concurrent runs from corrupting each other
 - Clear feed error reporting, including detection of HTML pages served in place of RSS/Atom
 - ETag / Last-Modified conditional requests - unchanged feeds skip re-processing (bandwidth-friendly)
 - Persistent state file (`ThreatRavenState.json`) - automatic deduplication across runs, feed health history, and NVD caching (no more manual previous-CSV prompts)
@@ -89,6 +92,7 @@ Edit `config.json` (or pass `-ConfigPath`). The loader validates the file, merge
 | `NvdCacheHours` | 6 | How long NVD results are cached in the state file |
 | `NvdKeywordFilter` | false | Only include CVEs whose description matches your keywords |
 | `MinHostRequestIntervalMs` | 250 | Min spacing between requests to the same host |
+| `HostRequestIntervalMsOverrides` | `{"reddit.com": 10000}` | Per-domain spacing overrides for rate-limited hosts (matches subdomains; enforced at request time across all workers, retries included) |
 | `GlobalTimeoutSeconds` | 900 | Overall deadline for all feeds |
 | `StateRetentionDays` | 90 | Prune seen links older than this |
 | `StateMaxEntries` | 20000 | Cap on stored seen links |
@@ -110,6 +114,7 @@ Edit `config.json` (or pass `-ConfigPath`). The loader validates the file, merge
 
 ## HTML Report Features
 
+- Single self-contained file: Chart.js and the logo are inlined, so the report can be shared or archived on its own (charts degrade to a notice instead of breaking the page if the library is ever unavailable)
 - Doughnut chart for keyword distribution and top-sources chart
 - Sortable, searchable data table with date/status filters
 - Dark/light theme toggle (persisted)
@@ -150,7 +155,7 @@ ThreatRaven/
 |   |-- screenshot.png
 |   '-- report-template.html    # HTML/JS/CSS report template ({{TOKEN}}s)
 |-- lib/
-|   '-- chart.min.js            # Chart.js (local, no CDN)
+|   '-- chart.min.js            # Chart.js (local, inlined into reports at generation)
 |-- Tests/                      # Pester tests + smoke configs
 |-- .github/workflows/ci.yml    # Pester + PSScriptAnalyzer + smoke CI
 |-- logs/                       # Created at runtime
