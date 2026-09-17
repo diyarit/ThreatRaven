@@ -18,14 +18,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Pester 5
+        shell: ${{ matrix.shell }}
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+
       - name: Run Pester tests
         shell: ${{ matrix.shell }}
         run: |
-          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
-          Import-Module $pester -Force
-          Invoke-Pester -Path ./Tests/FeedHelpers.Tests.ps1 -PassThru |
-            Select-Object -ExpandProperty FailedCount |
-            ForEach-Object { if ($_ -gt 0) { exit 1 } }
+          Import-Module Pester -MinimumVersion 5.5.0 -Force
+          $result = Invoke-Pester -Path ./Tests/FeedHelpers.Tests.ps1 -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0) { exit 1 }
+          if ($result.PassedCount -eq 0) { Write-Error 'No tests ran'; exit 1 }
 
   analyzer:
     name: PSScriptAnalyzer
@@ -42,11 +47,11 @@ jobs:
       - name: Analyze
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
-          if ($results.Count -gt 0) {
-            $results | Format-Table -AutoSize
-            exit 1
-          }
+          # Empty catch blocks are intentional best-effort cleanup (Dispose/Stop); PSScriptRoot is re-derived on purpose when invoked via -File.
+          $all = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost,PSUseShouldProcessForStateChangingFunctions,PSAvoidUsingEmptyCatchBlock,PSUseSingularNouns
+          $all | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+          $errors = @($all | Where-Object Severity -eq 'Error')
+          if ($errors.Count -gt 0) { Write-Error "$($errors.Count) analyzer error(s)"; exit 1 }
 
   smoke:
     name: Smoke run (live feeds, no NVD)
@@ -63,3 +68,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $csv = Get-ChildItem -LiteralPath $out -Filter *.csv | Select-Object -First 1
           if (-not $csv) { Write-Error 'No CSV report generated'; exit 1 }
+          $html = Get-ChildItem -LiteralPath $out -Filter *.html | Select-Object -First 1
+          if (-not $html) { Write-Error 'No HTML report generated'; exit 1 }
+          $content = Get-Content -LiteralPath $html.FullName -Raw
+          if ($content -notmatch 'id="tr-data"') { Write-Error 'Report is missing the embedded data block'; exit 1 }
+          if ($content -match '\{\{[A-Z_]+\}\}') { Write-Error 'Report has unreplaced template tokens'; exit 1 }
+          if (-not (Test-Path -LiteralPath $state)) { Write-Error 'State file was not written'; exit 1 }
+          $health = Get-ChildItem -LiteralPath $out -Filter 'FeedHealth_*.json' | Select-Object -First 1
+          if ($health) { Get-Content -LiteralPath $health.FullName -Raw | ConvertFrom-Json | Select-Object -ExpandProperty Summary | Format-List | Out-String | Write-Host }

@@ -12,10 +12,11 @@ logs/
 *.bak
 *.bak3
 
-# Persistent state (plus atomic-save temp and run lock files)
+# Persistent state (plus atomic-save temp, corrupt-state copies and run lock files)
 ThreatRavenState.json
 ThreatRavenState.json.bak
 *.json.tmp
+*.json.corrupt-*
 *.lock
 
 # Config snapshots

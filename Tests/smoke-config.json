@@ -48,11 +48,11 @@
         }
     },
     "Feeds": [
-        "https://www.thehackernews.com/feeds/posts/default",
-        "https://www.securelist.com/feed/",
+        "https://feeds.feedburner.com/TheHackersNews",
+        { "Url": "https://securelist.com/feed/", "Name": "Kaspersky Securelist", "Category": "Vendor Research" },
         "https://www.microsoft.com/en-us/security/blog/feed/",
         "https://unit42.paloaltonetworks.com/feed/",
-        "https://www.welivesecurity.com/feed/"
+        "https://www.welivesecurity.com/en/rss/feed/"
     ],
     "UserAgents": [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"

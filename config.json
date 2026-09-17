@@ -1,11 +1,12 @@
 {
-    "SchemaVersion": 1,
+    "SchemaVersion": 2,
     "Settings": {
         "VulnDays": 7,
-        "ThrottleLimit": 10,
-        "FeedTimeoutSeconds": 25,
+        "ThrottleLimit": 12,
+        "FeedTimeoutSeconds": 30,
         "MaxRetries": 3,
         "RetryBaseDelaySeconds": 2,
+        "MaxResponseBytes": 20971520,
         "LogLevel": "Info",
         "ValidateCertificates": true,
         "ExportHealthReport": false,
@@ -14,6 +15,10 @@
         "NvdMaxResults": 2000,
         "NvdCacheHours": 6,
         "NvdKeywordFilter": false,
+        "KevEnabled": true,
+        "EpssEnabled": true,
+        "EnrichmentCacheHours": 12,
+        "MitreMinKeywordHits": 1,
         "MinHostRequestIntervalMs": 250,
         "HostRequestIntervalMsOverrides": {
             "reddit.com": 10000
@@ -29,10 +34,16 @@
     },
     "Keywords": [
         "APT",
-        "campaign",
         "Advanced Persistent Threat",
+        "threat actor",
+        "nation-state",
+        "espionage",
+        "campaign",
         "Zero-day",
+        "zero-click",
+        "exploited in the wild",
         "Ransomware",
+        "wiper",
         "Lateral movement",
         "Persistence",
         "Evasion",
@@ -59,6 +70,9 @@
         "CVE",
         "Exploit",
         "vulnerability",
+        "vulnerabilities",
+        "remote code execution",
+        "RCE",
         "phishing",
         "initial access",
         "backdoor",
@@ -76,92 +90,38 @@
         "command and control",
         "C2",
         "beacon",
-        "exfiltration"
+        "exfiltration",
+        "cyberattack",
+        "hackers"
     ],
     "MitreKeywords": {
         "T1566": {
             "Name": "Phishing",
-            "Keywords": ["phishing", "spear phishing", "malicious email", "email lure", "attachment", "spoofed email", "fake invoice", "email campaign"]
+            "Keywords": ["phishing", "spear phishing", "spear-phishing", "malicious email", "email lure", "spoofed email", "fake invoice", "email campaign", "phishing kit", "credential harvesting", "quishing", "smishing", "vishing"]
+        },
+        "T1566.001": {
+            "Name": "Spearphishing Attachment",
+            "Keywords": ["malicious attachment", "weaponized document", "malicious document", "maldoc", "iso attachment", "lnk attachment", "malicious pdf"]
+        },
+        "T1566.002": {
+            "Name": "Spearphishing Link",
+            "Keywords": ["malicious link", "phishing link", "phishing page", "credential phishing", "adversary-in-the-middle phishing", "evilginx"]
+        },
+        "T1557": {
+            "Name": "Adversary-in-the-Middle",
+            "Keywords": ["adversary-in-the-middle", "aitm", "man-in-the-middle", "mitm", "session hijacking", "token theft", "cookie theft"]
+        },
+        "T1621": {
+            "Name": "Multi-Factor Authentication Request Generation",
+            "Keywords": ["mfa fatigue", "mfa bombing", "push bombing", "mfa bypass", "prompt bombing"]
         },
         "T1059": {
             "Name": "Command and Scripting Interpreter",
-            "Keywords": ["powershell", "pwsh", "ps1", "cmd.exe", "command line", "bash", "sh", "zsh", "python", "python script", "wscript", "cscript", "javascript", "vbscript", "batch script"]
-        },
-        "T1055": {
-            "Name": "Process Injection",
-            "Keywords": ["process injection", "dll injection", "reflective loading", "hollowing", "process hollowing", "thread injection", "apc injection", "process doppelgänging"]
-        },
-        "T1190": {
-            "Name": "Exploit Public-Facing Application",
-            "Keywords": ["web exploit", "sql injection", "sqli", "rce", "remote code execution", "zero-day", "path traversal", "file upload exploit", "web application vulnerability"]
-        },
-        "T1078": {
-            "Name": "Valid Accounts",
-            "Keywords": ["compromised credentials", "stolen password", "valid account", "successful logon", "unauthorized login", "credential reuse", "default credentials"]
-        },
-        "T1021": {
-            "Name": "Remote Services",
-            "Keywords": ["rdp", "remote desktop", "ssh", "smb", "psexec", "winrm", "remote login", "vnc", "teamviewer", "anydesk", "remote access"]
-        },
-        "T1105": {
-            "Name": "Ingress Tool Transfer",
-            "Keywords": ["download payload", "curl", "wget", "bitsadmin", "file transfer", "dropper", "stager", "malware download", "payload delivery", "download", "transfer", "copy", "certutil", "powershell download"]
-        },
-        "T1486": {
-            "Name": "Data Encrypted for Impact",
-            "Keywords": ["ransomware", "encryption", "encrypted files", "crypto locker", "ransom note", "file encryption", "data encryption"]
-        },
-        "T1082": {
-            "Name": "System Information Discovery",
-            "Keywords": ["system info", "host discovery", "os version", "hardware info", "environment discovery", "system enumeration"]
-        },
-        "T1071": {
-            "Name": "Application Layer Protocol",
-            "Keywords": ["c2", "command and control", "c&c", "http c2", "dns tunneling", "https beacon", "websocket", "covert channel"]
-        },
-        "T1083": {
-            "Name": "File and Directory Discovery",
-            "Keywords": ["file search", "directory listing", "dir listing", "file enumeration", "tree", "find", "ls", "get-childitem", "file discovery"]
-        },
-        "T1574": {
-            "Name": "Hijack Execution Flow",
-            "Keywords": ["dll hijacking", "search order hijack", "path interception", "side loading", "dll search order"]
-        },
-        "T1003": {
-            "Name": "OS Credential Dumping",
-            "Keywords": ["mimikatz", "lsass dump", "procdump lsass", "sam dump", "credential dumping", "sekurlsa", "dcsync"]
-        },
-        "T1027": {
-            "Name": "Obfuscated Files or Information",
-            "Keywords": ["obfuscation", "encoded", "base64 payload", "packed malware", "steganography", "encrypted payload", "code obfuscation"]
-        },
-        "T1070": {
-            "Name": "Indicator Removal",
-            "Keywords": ["clear logs", "log deletion", "wevtutil", "anti-forensics", "clear event log", "log tampering"]
-        },
-        "T1204": {
-            "Name": "User Execution",
-            "Keywords": ["user clicked", "user opened", "malicious macro", "document execution", "unsafe download", "social engineering"]
-        },
-        "T1053": {
-            "Name": "Scheduled Task/Job",
-            "Keywords": ["schtasks", "cron job", "task scheduler", "at command", "persistent task", "scheduled task"]
-        },
-        "T1562": {
-            "Name": "Impair Defenses",
-            "Keywords": ["disable antivirus", "tamper protection", "disable firewall", "stop security service", "endpoint protection disabled", "defense evasion"]
-        },
-        "T1087": {
-            "Name": "Account Discovery",
-            "Keywords": ["user enumeration", "net user", "active directory users", "whoami", "account discovery", "ad enumeration"]
-        },
-        "T1018": {
-            "Name": "Remote System Discovery",
-            "Keywords": ["network scan", "nmap", "ping sweep", "port scan", "host scan", "net view", "network discovery"]
+            "Keywords": ["powershell", "pwsh", "cmd.exe", "wscript", "cscript", "vbscript", "batch script", "python script", "malicious script", "script interpreter", "shell script"]
         },
         "T1059.001": {
             "Name": "PowerShell",
-            "Keywords": ["powershell", "pwsh", "ps1", "powershell.exe", "powershell script", "encoded command"]
+            "Keywords": ["powershell", "pwsh", "powershell.exe", "powershell script", "encoded command", "encodedcommand"]
         },
         "T1059.003": {
             "Name": "Windows Command Shell",
@@ -169,279 +129,275 @@
         },
         "T1059.005": {
             "Name": "Visual Basic",
-            "Keywords": ["vbscript", "vba", "macro", "visual basic", "vb script", "office macro"]
+            "Keywords": ["vbscript", "vba", "macro", "visual basic", "vb script", "office macro", "vbs"]
         },
         "T1059.007": {
             "Name": "JavaScript",
-            "Keywords": ["javascript", "js file", "jscript", "node.js", "javascript execution"]
+            "Keywords": ["jscript", "malicious javascript", "js file", "javascript dropper", "javascript loader", "obfuscated javascript"]
         },
-        "T1027.001": {
-            "Name": "Binary Padding",
-            "Keywords": ["binary padding", "file padding", "executable padding", "null bytes"]
+        "T1055": {
+            "Name": "Process Injection",
+            "Keywords": ["process injection", "dll injection", "reflective loading", "hollowing", "process hollowing", "thread injection", "apc injection", "process doppelgänging", "shellcode injection"]
         },
-        "T1027.002": {
-            "Name": "Software Packing",
-            "Keywords": ["packed", "upx", "aspack", "petite", "themida", "vmprotect"]
+        "T1190": {
+            "Name": "Exploit Public-Facing Application",
+            "Keywords": ["web exploit", "sql injection", "sqli", "rce", "remote code execution", "zero-day", "path traversal", "file upload exploit", "web application vulnerability", "exploited in the wild", "pre-auth", "unauthenticated attacker", "edge device", "vpn appliance"]
         },
-        "T1027.005": {
-            "Name": "Indicator Removal from Tools",
-            "Keywords": ["string removal", "debug evasion", "anti-analysis", "tool evasion"]
+        "T1133": {
+            "Name": "External Remote Services",
+            "Keywords": ["vpn credentials", "exposed rdp", "citrix netscaler", "external remote services", "ssl vpn", "exposed remote access"]
         },
-        "T1140": {
-            "Name": "Deobfuscate/Decode Files or Information",
-            "Keywords": ["deobfuscate", "decode", "base64 decode", "xor decode", "unpack"]
+        "T1195": {
+            "Name": "Supply Chain Compromise",
+            "Keywords": ["supply chain", "supply-chain", "trojanized installer", "malicious package", "npm package", "pypi package", "compromised update", "software supply chain"]
+        },
+        "T1199": {
+            "Name": "Trusted Relationship",
+            "Keywords": ["trusted relationship", "msp compromise", "third-party access", "vendor access", "managed service provider"]
+        },
+        "T1078": {
+            "Name": "Valid Accounts",
+            "Keywords": ["compromised credentials", "stolen password", "valid account", "unauthorized login", "credential reuse", "default credentials", "stolen credentials", "leaked credentials", "credential stuffing"]
+        },
+        "T1136": {
+            "Name": "Create Account",
+            "Keywords": ["created a new account", "rogue account", "backdoor account", "new admin account", "creates a local account"]
+        },
+        "T1021": {
+            "Name": "Remote Services",
+            "Keywords": ["rdp", "remote desktop", "psexec", "winrm", "vnc", "teamviewer", "anydesk", "screenconnect", "atera", "rmm tool", "lateral movement"]
+        },
+        "T1105": {
+            "Name": "Ingress Tool Transfer",
+            "Keywords": ["download payload", "bitsadmin", "dropper", "stager", "malware download", "payload delivery", "certutil", "powershell download", "second-stage payload", "downloads additional", "loader"]
+        },
+        "T1204": {
+            "Name": "User Execution",
+            "Keywords": ["malicious macro", "social engineering", "lure document", "fake installer", "malvertising", "clickfix", "fake update", "fake captcha", "seo poisoning"]
+        },
+        "T1218": {
+            "Name": "System Binary Proxy Execution",
+            "Keywords": ["rundll32", "regsvr32", "mshta", "msiexec", "lolbin", "lolbas", "living off the land", "signed binary proxy"]
+        },
+        "T1547": {
+            "Name": "Boot or Logon Autostart Execution",
+            "Keywords": ["run key", "registry run", "startup folder", "autostart", "runonce", "winlogon helper"]
+        },
+        "T1543.003": {
+            "Name": "Create or Modify System Process: Windows Service",
+            "Keywords": ["malicious service", "creates a service", "service installation", "sc create", "new service"]
+        },
+        "T1053": {
+            "Name": "Scheduled Task/Job",
+            "Keywords": ["schtasks", "cron job", "task scheduler", "persistent task", "scheduled task"]
+        },
+        "T1053.005": {
+            "Name": "Scheduled Task",
+            "Keywords": ["schtasks", "task scheduler", "scheduled task"]
+        },
+        "T1053.003": {
+            "Name": "Cron",
+            "Keywords": ["cron", "crontab"]
+        },
+        "T1486": {
+            "Name": "Data Encrypted for Impact",
+            "Keywords": ["ransomware", "crypto locker", "ransom note", "file encryption", "encrypts files", "double extortion", "encryptor", "locker"]
+        },
+        "T1490": {
+            "Name": "Inhibit System Recovery",
+            "Keywords": ["vssadmin", "shadow copies", "shadow copy", "bcdedit", "wbadmin", "delete backups", "inhibit recovery"]
+        },
+        "T1489": {
+            "Name": "Service Stop",
+            "Keywords": ["stops services", "service stop", "kills processes", "terminates security", "net stop"]
+        },
+        "T1082": {
+            "Name": "System Information Discovery",
+            "Keywords": ["system info", "host discovery", "os version", "hardware info", "environment discovery", "system enumeration", "systeminfo", "reconnaissance"]
+        },
+        "T1071": {
+            "Name": "Application Layer Protocol",
+            "Keywords": ["c2", "command and control", "c&c", "http c2", "dns tunneling", "https beacon", "covert channel", "c2 server", "c2 infrastructure", "command-and-control"]
+        },
+        "T1071.001": {
+            "Name": "Web Protocols",
+            "Keywords": ["http c2", "https c2", "http beacon", "https beacon", "web-based c2"]
+        },
+        "T1071.004": {
+            "Name": "DNS",
+            "Keywords": ["dns tunneling", "dns c2", "dns over https c2", "doh c2", "dns beacon"]
+        },
+        "T1083": {
+            "Name": "File and Directory Discovery",
+            "Keywords": ["file enumeration", "file discovery", "get-childitem", "directory enumeration", "enumerates files", "searches for files"]
+        },
+        "T1574": {
+            "Name": "Hijack Execution Flow",
+            "Keywords": ["dll hijacking", "search order hijack", "path interception", "side loading", "dll search order", "dll sideloading", "side-loading", "sideloaded"]
+        },
+        "T1003": {
+            "Name": "OS Credential Dumping",
+            "Keywords": ["mimikatz", "lsass dump", "procdump lsass", "sam dump", "credential dumping", "sekurlsa", "dcsync", "nanodump", "credential dump"]
         },
         "T1003.001": {
             "Name": "LSASS Memory",
-            "Keywords": ["lsass", "mimikatz", "sekurlsa", "lsass dump", "process memory"]
+            "Keywords": ["lsass", "mimikatz", "sekurlsa", "lsass dump", "comsvcs"]
         },
         "T1003.002": {
             "Name": "Security Account Manager",
-            "Keywords": ["sam", "sam database", "sam dump", "registry hive"]
+            "Keywords": ["sam database", "sam dump", "sam hive", "reg save hklm\\sam"]
         },
         "T1003.003": {
             "Name": "NTDS",
-            "Keywords": ["ntds", "ntds.dit", "domain controller", "ad replication"]
+            "Keywords": ["ntds", "ntds.dit"]
         },
         "T1003.006": {
             "Name": "DCSync",
             "Keywords": ["dcsync", "directory replication", "drsuapi", "domain replication"]
         },
-        "T1053.005": {
-            "Name": "Scheduled Task",
-            "Keywords": ["schtasks", "task scheduler", "scheduled task", "task creation"]
+        "T1027": {
+            "Name": "Obfuscated Files or Information",
+            "Keywords": ["obfuscation", "obfuscated", "base64 payload", "packed malware", "steganography", "encrypted payload", "code obfuscation", "string encryption", "control flow flattening"]
         },
-        "T1053.003": {
-            "Name": "Cron",
-            "Keywords": ["cron", "crontab", "scheduled job", "periodic task"]
-        },
-        "T1070.001": {
-            "Name": "Clear Windows Event Logs",
-            "Keywords": ["wevtutil", "event log", "clear log", "event viewer"]
-        },
-        "T1070.004": {
-            "Name": "File Deletion",
-            "Keywords": ["file deletion", "shred", "secure delete", "file removal"]
-        },
-        "T1070.006": {
-            "Name": "Timestomp",
-            "Keywords": ["timestomp", "timestamp", "modify timestamp", "touch file"]
+        "T1027.002": {
+            "Name": "Software Packing",
+            "Keywords": ["upx", "themida", "vmprotect", "aspack", "software packing", "packer", "crypter"]
         },
         "T1027.010": {
             "Name": "Command Obfuscation",
-            "Keywords": ["command obfuscation", "encoded command", "obfuscated command"]
+            "Keywords": ["command obfuscation", "encoded command", "obfuscated command", "obfuscated powershell"]
         },
-        "T1027.013": {
-            "Name": "Encrypted/Encoded File",
-            "Keywords": ["encrypted file", "encoded file", "password protected"]
+        "T1140": {
+            "Name": "Deobfuscate/Decode Files or Information",
+            "Keywords": ["deobfuscate", "base64 decode", "xor decode", "deobfuscation", "decrypts the payload", "xor-encoded"]
         },
-        "T1105.001": {
-            "Name": "Web Service",
-            "Keywords": ["web download", "http download", "cloud storage", "file share"]
+        "T1070": {
+            "Name": "Indicator Removal",
+            "Keywords": ["clear logs", "log deletion", "wevtutil", "anti-forensics", "clear event log", "log tampering", "covers its tracks"]
+        },
+        "T1070.001": {
+            "Name": "Clear Windows Event Logs",
+            "Keywords": ["wevtutil", "clear event log", "event log cleared", "clear-eventlog"]
+        },
+        "T1070.004": {
+            "Name": "File Deletion",
+            "Keywords": ["self-delete", "deletes itself", "secure delete", "shred", "self-deletion"]
+        },
+        "T1070.006": {
+            "Name": "Timestomp",
+            "Keywords": ["timestomp", "timestomping", "modify timestamp"]
+        },
+        "T1562": {
+            "Name": "Impair Defenses",
+            "Keywords": ["disable antivirus", "tamper protection", "disable firewall", "stop security service", "endpoint protection disabled", "defense evasion", "disable defender", "edr killer", "bypass edr", "byovd", "vulnerable driver"]
+        },
+        "T1087": {
+            "Name": "Account Discovery",
+            "Keywords": ["user enumeration", "net user", "active directory users", "account discovery", "ad enumeration", "bloodhound", "sharphound", "adfind"]
+        },
+        "T1018": {
+            "Name": "Remote System Discovery",
+            "Keywords": ["nmap", "ping sweep", "port scan", "host scan", "net view", "network discovery", "internal reconnaissance", "network scanning", "advanced ip scanner", "netscan"]
         },
         "T1114": {
             "Name": "Email Collection",
-            "Keywords": ["email collection", "email forwarding", "email access", "email exfiltration"]
-        },
-        "T1114.001": {
-            "Name": "Local Email Collection",
-            "Keywords": ["local email", "email file", "pst file", "ost file"]
-        },
-        "T1114.002": {
-            "Name": "Remote Email Collection",
-            "Keywords": ["remote email", "exchange", "email server", "imap", "pop3"]
+            "Keywords": ["email collection", "email forwarding", "mailbox access", "email exfiltration", "forwarding rule", "inbox rule"]
         },
         "T1560": {
             "Name": "Archive Collected Data",
-            "Keywords": ["archive", "compress", "zip", "7z", "rar", "tar"]
-        },
-        "T1560.001": {
-            "Name": "Archive via Utility",
-            "Keywords": ["7zip", "winrar", "winzip", "compression utility"]
-        },
-        "T1560.002": {
-            "Name": "Archive via Library",
-            "Keywords": ["compression library", "zip library", "archive library"]
-        },
-        "T1560.003": {
-            "Name": "Archive via Custom Method",
-            "Keywords": ["custom archive", "custom compression", "manual archive"]
+            "Keywords": ["archive collected data", "compressed archive", "staged data", "data staging", "7zip", "winrar", "rar.exe", "7z.exe", "archives the data"]
         },
         "T1048": {
             "Name": "Exfiltration Over Alternative Protocol",
-            "Keywords": ["exfiltration", "data transfer", "alternative protocol", "dns exfiltration"]
-        },
-        "T1048.001": {
-            "Name": "Exfiltration Over Symmetric Encrypted Non-C2 Protocol",
-            "Keywords": ["encrypted transfer", "ssl exfiltration", "tls exfiltration"]
-        },
-        "T1048.002": {
-            "Name": "Exfiltration Over Asymmetric Encrypted Non-C2 Protocol",
-            "Keywords": ["asymmetric encryption", "public key", "pgp exfiltration"]
-        },
-        "T1048.003": {
-            "Name": "Exfiltration Over Unencrypted Non-C2 Protocol",
-            "Keywords": ["http exfiltration", "ftp exfiltration", "unencrypted transfer"]
+            "Keywords": ["exfiltration", "dns exfiltration", "exfiltrate", "exfiltrated", "data theft", "ftp exfiltration"]
         },
         "T1567": {
             "Name": "Exfiltration Over Web Service",
-            "Keywords": ["web exfiltration", "cloud storage", "file sharing", "paste site"]
+            "Keywords": ["web exfiltration", "paste site", "exfiltration to cloud", "mega.nz", "rclone", "megasync", "exfiltration to dropbox", "telegram bot", "discord webhook"]
         },
         "T1567.002": {
             "Name": "Exfiltration to Cloud Storage",
-            "Keywords": ["aws", "azure", "google cloud", "dropbox", "onedrive", "box"]
-        },
-        "T1029": {
-            "Name": "Scheduled Transfer",
-            "Keywords": ["scheduled transfer", "periodic exfiltration", "timed transfer"]
+            "Keywords": ["mega.nz", "rclone", "megasync", "exfiltration to dropbox", "exfiltration to onedrive", "cloud storage exfiltration"]
         },
         "T1041": {
             "Name": "Exfiltration Over C2 Channel",
-            "Keywords": ["c2 exfiltration", "command channel", "beacon exfiltration"]
-        },
-        "T1043": {
-            "Name": "Commonly Used Port",
-            "Keywords": ["port 80", "port 443", "common port", "standard port"]
+            "Keywords": ["c2 exfiltration", "exfiltrated over c2", "beacon exfiltration", "over the c2 channel"]
         },
         "T1090": {
             "Name": "Proxy",
-            "Keywords": ["proxy", "forward proxy", "reverse proxy", "c2 proxy"]
-        },
-        "T1090.001": {
-            "Name": "Internal Proxy",
-            "Keywords": ["internal proxy", "lan proxy", "local proxy"]
-        },
-        "T1090.002": {
-            "Name": "External Proxy",
-            "Keywords": ["external proxy", "public proxy", "vpn proxy"]
+            "Keywords": ["c2 proxy", "proxy chain", "socks proxy", "residential proxy", "proxyware", "reverse proxy c2"]
         },
         "T1090.003": {
             "Name": "Multi-hop Proxy",
-            "Keywords": ["multi-hop", "proxy chain", "tor", "onion routing"]
+            "Keywords": ["multi-hop", "proxy chain", "tor", "onion routing", "orb network", "operational relay box"]
         },
         "T1090.004": {
             "Name": "Domain Fronting",
             "Keywords": ["domain fronting", "cdn abuse", "domain hiding"]
         },
-        "T1071.001": {
-            "Name": "Web Protocols",
-            "Keywords": ["http", "https", "web protocol", "http traffic"]
-        },
-        "T1071.002": {
-            "Name": "File Transfer Protocols",
-            "Keywords": ["ftp", "sftp", "file transfer", "tftp"]
-        },
-        "T1071.003": {
-            "Name": "Mail Protocols",
-            "Keywords": ["smtp", "imap", "pop3", "email protocol"]
-        },
-        "T1071.004": {
-            "Name": "DNS",
-            "Keywords": ["dns", "dns query", "dns tunneling", "domain name"]
-        },
         "T1573": {
             "Name": "Encrypted Channel",
-            "Keywords": ["encrypted channel", "ssl", "tls", "https", "encrypted communication"]
-        },
-        "T1573.001": {
-            "Name": "Symmetric Cryptography",
-            "Keywords": ["aes", "des", "rc4", "symmetric encryption"]
-        },
-        "T1573.002": {
-            "Name": "Asymmetric Cryptography",
-            "Keywords": ["rsa", "ecc", "public key", "asymmetric encryption"]
+            "Keywords": ["encrypted channel", "encrypted c2", "custom encryption", "encrypted communication with c2", "tls c2"]
         },
         "T1001": {
             "Name": "Data Obfuscation",
-            "Keywords": ["data obfuscation", "data hiding", "traffic obfuscation"]
-        },
-        "T1001.001": {
-            "Name": "Junk Data",
-            "Keywords": ["junk data", "noise", "padding", "random data"]
+            "Keywords": ["data obfuscation", "traffic obfuscation", "junk data", "protocol impersonation", "traffic mimicry"]
         },
         "T1001.002": {
             "Name": "Steganography",
-            "Keywords": ["steganography", "hidden data", "image steganography"]
-        },
-        "T1001.003": {
-            "Name": "Protocol Impersonation",
-            "Keywords": ["protocol impersonation", "traffic mimicry", "protocol spoofing"]
+            "Keywords": ["steganography", "hidden in image", "image steganography", "steganographic"]
         },
         "T1568": {
             "Name": "Dynamic Resolution",
-            "Keywords": ["dynamic dns", "ddns", "domain generation", "dga"]
-        },
-        "T1568.001": {
-            "Name": "Fast Flux DNS",
-            "Keywords": ["fast flux", "dns rotation", "ip rotation"]
+            "Keywords": ["dynamic dns", "ddns", "domain generation", "dga", "fast flux", "dead drop resolver"]
         },
         "T1568.002": {
             "Name": "Domain Generation Algorithms",
             "Keywords": ["dga", "domain generation", "algorithmically generated"]
         },
-        "T1568.003": {
-            "Name": "DNS Calculation",
-            "Keywords": ["dns calculation", "domain math", "algorithmic domain"]
-        },
         "T1008": {
             "Name": "Fallback Channels",
-            "Keywords": ["fallback", "backup channel", "failover", "redundant c2"]
+            "Keywords": ["fallback channel", "backup c2", "redundant c2", "fallback c2", "secondary c2"]
         },
         "T1104": {
             "Name": "Multi-Stage Channels",
-            "Keywords": ["multi-stage", "staged payload", "stager", "bootstrap"]
+            "Keywords": ["multi-stage", "staged payload", "stager", "multi-stage infection", "infection chain"]
         },
         "T1095": {
             "Name": "Non-Application Layer Protocol",
-            "Keywords": ["raw socket", "tcp", "udp", "icmp", "non-http"]
+            "Keywords": ["raw socket", "icmp tunnel", "icmp c2", "custom tcp protocol", "non-http c2", "custom binary protocol"]
         },
         "T1572": {
             "Name": "Protocol Tunneling",
-            "Keywords": ["tunnel", "protocol tunnel", "dns tunnel", "http tunnel"]
+            "Keywords": ["protocol tunnel", "dns tunnel", "http tunnel", "ssh tunnel", "ngrok", "chisel", "ligolo", "plink", "tunneling tool"]
         },
         "T1092": {
-            "Name": "Removable Media",
-            "Keywords": ["usb", "removable media", "flash drive", "external drive"]
-        },
-        "T1092.001": {
-            "Name": "Malicious Media",
-            "Keywords": ["malicious usb", "infected drive", "usb drop"]
+            "Name": "Communication Through Removable Media",
+            "Keywords": ["removable media", "flash drive", "usb drive", "usb worm", "infected usb", "air-gapped"]
         },
         "T1558": {
             "Name": "Steal or Forge Kerberos Tickets",
-            "Keywords": ["kerberos", "ticket", "golden ticket", "silver ticket"]
+            "Keywords": ["kerberos ticket", "golden ticket", "silver ticket", "kerberos attack", "kerberoasting", "rubeus"]
         },
         "T1558.001": {
             "Name": "Golden Ticket",
-            "Keywords": ["golden ticket", "krbtgt", "forged ticket"]
-        },
-        "T1558.002": {
-            "Name": "Silver Ticket",
-            "Keywords": ["silver ticket", "service ticket", "forged service"]
+            "Keywords": ["golden ticket", "krbtgt", "forged tgt"]
         },
         "T1558.003": {
             "Name": "Kerberoasting",
-            "Keywords": ["kerberoasting", "spn", "service principal name", "tgs"]
+            "Keywords": ["kerberoasting", "kerberoast", "service principal name"]
         },
         "T1558.004": {
             "Name": "AS-REP Roasting",
-            "Keywords": ["as-rep", "asrep roasting", "preauth"]
+            "Keywords": ["as-rep", "asrep roasting", "as-rep roasting", "preauth"]
         },
         "T1552": {
             "Name": "Unsecured Credentials",
-            "Keywords": ["unsecured credentials", "plaintext password", "credential file"]
-        },
-        "T1552.001": {
-            "Name": "Credentials In Files",
-            "Keywords": ["credentials in files", "password file", "config file credentials"]
-        },
-        "T1552.002": {
-            "Name": "Registry Stored Credentials",
-            "Keywords": ["registry credentials", "stored password", "credential registry"]
+            "Keywords": ["unsecured credentials", "plaintext password", "credential file", "hardcoded credentials", "hard-coded credentials", "credentials in files", "password file"]
         },
         "T1552.004": {
             "Name": "Private Keys",
-            "Keywords": ["private key", "ssl certificate", "ssh key", "certificate"]
+            "Keywords": ["private key theft", "ssh key theft", "stolen certificate", "stolen private key", "signing key"]
         },
         "T1552.005": {
             "Name": "Cloud Instance Metadata API",
@@ -449,130 +405,149 @@
         },
         "T1552.006": {
             "Name": "Group Policy Preferences",
-            "Keywords": ["gpp", "group policy", "cpassword", "sysvol"]
+            "Keywords": ["gpp", "cpassword", "group policy preferences", "sysvol"]
         },
         "T1552.007": {
             "Name": "Container API",
-            "Keywords": ["container api", "docker api", "kubernetes api"]
+            "Keywords": ["docker api", "kubernetes api", "exposed docker", "kubelet", "container escape"]
         },
         "T1555": {
             "Name": "Credentials from Password Stores",
-            "Keywords": ["password store", "password manager", "credential store"]
-        },
-        "T1555.001": {
-            "Name": "Keychain",
-            "Keywords": ["keychain", "macOS keychain", "credentials manager"]
-        },
-        "T1555.002": {
-            "Name": "Securityd Memory",
-            "Keywords": ["securityd", "memory credentials", "cached credentials"]
+            "Keywords": ["password store", "password manager", "credential store", "credential manager", "keychain", "browser credentials", "saved password", "browser password theft", "lastpass", "1password", "keepass", "bitwarden", "vaultcmd", "hashicorp vault", "azure key vault", "aws secrets manager"]
         },
         "T1555.003": {
             "Name": "Credentials from Web Browsers",
-            "Keywords": ["browser credentials", "saved password", "autofill", "browser data"]
-        },
-        "T1555.004": {
-            "Name": "Windows Credential Manager",
-            "Keywords": ["credential manager", "vault", "windows credential"]
-        },
-        "T1555.005": {
-            "Name": "Password Managers",
-            "Keywords": ["lastpass", "1password", "keepass", "password manager"]
-        },
-        "T1555.006": {
-            "Name": "Cloud Secrets Management Stores",
-            "Keywords": ["aws secrets", "azure key vault", "cloud secrets", "vault"]
+            "Keywords": ["browser credentials", "saved password", "browser password theft", "cookie theft", "session cookies", "browser data theft", "chromium credentials"]
         }
     },
     "Feeds": [
-        "https://www.thehackernews.com/feeds/posts/default",
-        "https://www.securelist.com/feed/",
-        "https://www.microsoft.com/en-us/security/blog/feed/",
-        "https://unit42.paloaltonetworks.com/feed/",
-        "https://www.welivesecurity.com/feed/",
-        "https://www.crowdstrike.com/blog/feed/",
-        "https://cloudblog.withgoogle.com/topics/threat-intelligence/rss/",
-        "https://research.checkpoint.com/feed/",
-        "https://blog.badsectorlabs.com/feeds/all.atom.xml",
-        "https://cyberbuilders.substack.com/feed",
-        "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml",
-        "https://blogs.cisco.com/security/feed",
-        "http://feeds.trendmicro.com/TrendMicroResearch",
-        "https://www.bleepingcomputer.com/feed/",
-        "https://www.techrepublic.com/rssfeeds/topic/cybersecurity/",
-        "https://www.proofpoint.com/us/rss.xml",
-        "https://heimdalsecurity.com/blog/feed/",
-        "https://www.yeswehack.com/rss.xml",
-        "https://feeds.feedburner.com/GoogleOnlineSecurityBlog",
-        "https://any.run/cybersecurity-blog/feed/",
-        "https://www.exploitone.com/feed/",
-        "https://www.cisa.gov/cybersecurity-advisories/all.xml",
-        "https://feeds.feedburner.com/HackRead",
-        "https://www.hackmageddon.com/feed/",
-        "https://www.infosecurity-magazine.com/rss/news/",
-        "https://krebsonsecurity.com/feed/",
-        "https://www.zdnet.com/news/rss.xml",
-        "https://blog.0patch.com/feeds/posts/default",
-        "https://www.bitdefender.com/nuxt/api/en-us/rss/labs/",
-        "https://feeds.feedburner.com/feedburner/Talos",
-        "https://blog.cloudflare.com/tag/security/rss",
-        "https://projectzero.google/feed.xml",
-        "https://www.malwarebytes.com/blog/feed/index.xml",
-        "https://www.cisecurity.org/feed/advisories",
-        "https://isc.sans.edu/rssfeed_full.xml",
-        "https://nao-sec.org/feed",
-        "https://www.reddit.com/r/cybersecurity/.rss",
-        "https://www.reddit.com/r/netsec/.rss",
-        "https://www.reddit.com/r/blueteamsec/.rss",
-        "https://www.reddit.com/r/purpleteamsec/.rss",
-        "https://www.reddit.com/r/redteamsec/.rss",
-        "https://blog.qualys.com/feed",
-        "https://blog.quarkslab.com/feeds/all.rss.xml",
-        "https://sensepost.com/rss.xml",
-        "https://www.sentinelone.com/labs/feed/",
-        "https://www.darkreading.com/rss.xml",
-        "https://cybersecuritynews.com/feed/",
-        "https://www.zerodayinitiative.com/rss/published/",
-        "https://www.resecurity.com/feed",
-        "https://therecord.media/feed",
-        "https://cyberscoop.com/feed/",
-        "https://feeds.feedburner.com/securityweek",
-        "https://portswigger.net/research/rss",
-        "https://www.helpnetsecurity.com/feed/",
-        "https://securityledger.com/feed/",
-        "https://cyberpress.org/feed/",
-        "https://blog.knowbe4.com/rss.xml",
-        "https://sebdraven.medium.com/feed",
-        "http://www.darknet.org.uk/feed/",
-        "https://www.nist.gov/blogs/cybersecurity-insights/rss.xml",
-        "https://us-cert.cisa.gov/ics/advisories/advisories.xml",
-        "https://us-cert.cisa.gov/ncas/alerts.xml",
-        "https://us-cert.cisa.gov/ncas/analysis-reports.xml",
-        "https://us-cert.cisa.gov/ncas/current-activity.xml",
-        "https://medium.com/feed/anton-on-security",
-        "https://arstechnica.com/tag/security/feed/",
-        "https://www.bellingcat.com/feed/",
-        "https://www.grahamcluley.com/feed/",
-        "https://www.theguardian.com/technology/data-computer-security/rss",
-        "https://www.schneier.com/blog/atom.xml",
-        "http://securityaffairs.co/wordpress/feed",
-        "https://www.wired.com/feed/category/security/latest/rss",
-        "https://sed-cms.broadcom.com/rss/v1/blogs/rss.xml",
-        "https://blog.eclecticiq.com/rss.xml",
-        "https://feeds.fortinet.com/fortinet/blog/threat-research"
+        { "Url": "https://securelist.com/feed/", "Name": "Kaspersky Securelist", "Category": "Vendor Research" },
+        { "Url": "https://www.microsoft.com/en-us/security/blog/feed/", "Name": "Microsoft Security Blog", "Category": "Vendor Research" },
+        { "Url": "https://unit42.paloaltonetworks.com/feed/", "Name": "Palo Alto Unit 42", "Category": "Vendor Research" },
+        { "Url": "https://www.welivesecurity.com/en/rss/feed/", "Name": "ESET WeLiveSecurity", "Category": "Vendor Research" },
+        { "Url": "https://www.crowdstrike.com/en-us/blog/feed", "Name": "CrowdStrike Blog", "Category": "Vendor Research" },
+        { "Url": "https://cloudblog.withgoogle.com/topics/threat-intelligence/rss/", "Name": "Google Threat Intelligence", "Category": "Vendor Research" },
+        { "Url": "https://research.checkpoint.com/feed/", "Name": "Check Point Research", "Category": "Vendor Research" },
+        { "Url": "https://blogs.cisco.com/security/feed", "Name": "Cisco Security Blog", "Category": "Vendor Research" },
+        { "Url": "https://blog.talosintelligence.com/rss/", "Name": "Cisco Talos", "Category": "Vendor Research" },
+        { "Url": "http://feeds.trendmicro.com/TrendMicroResearch", "Name": "Trend Micro Research", "Category": "Vendor Research" },
+        { "Url": "https://www.proofpoint.com/us/rss.xml", "Name": "Proofpoint", "Category": "Vendor Research" },
+        { "Url": "https://feeds.feedburner.com/GoogleOnlineSecurityBlog", "Name": "Google Security Blog", "Category": "Vendor Research" },
+        { "Url": "https://any.run/cybersecurity-blog/feed/", "Name": "ANY.RUN", "Category": "Vendor Research" },
+        { "Url": "https://0patch.com/rss.xml", "Name": "0patch", "Category": "Vendor Research" },
+        { "Url": "https://www.bitdefender.com/nuxt/api/en-us/rss/labs/", "Name": "Bitdefender Labs", "Category": "Vendor Research" },
+        { "Url": "https://blog.cloudflare.com/tag/security/rss", "Name": "Cloudflare Security", "Category": "Vendor Research" },
+        { "Url": "https://projectzero.google/feed.xml", "Name": "Google Project Zero", "Category": "Vendor Research" },
+        { "Url": "https://www.malwarebytes.com/blog/feed/index.xml", "Name": "Malwarebytes Labs", "Category": "Vendor Research" },
+        { "Url": "https://nao-sec.org/feed", "Name": "nao_sec", "Category": "Vendor Research" },
+        { "Url": "https://blog.qualys.com/feed", "Name": "Qualys", "Category": "Vendor Research" },
+        { "Url": "https://blog.quarkslab.com/feeds/all.rss.xml", "Name": "Quarkslab", "Category": "Vendor Research" },
+        { "Url": "https://sensepost.com/rss.xml", "Name": "SensePost", "Category": "Vendor Research" },
+        { "Url": "https://www.sentinelone.com/labs/feed/", "Name": "SentinelLabs", "Category": "Vendor Research" },
+        { "Url": "https://www.resecurity.com/feed", "Name": "Resecurity", "Category": "Vendor Research" },
+        { "Url": "https://portswigger.net/research/rss", "Name": "PortSwigger Research", "Category": "Vendor Research" },
+        { "Url": "https://sed-cms.broadcom.com/rss/v1/blogs/rss.xml", "Name": "Symantec (Broadcom)", "Category": "Vendor Research" },
+        { "Url": "https://blog.eclecticiq.com/rss.xml", "Name": "EclecticIQ", "Category": "Vendor Research" },
+        { "Url": "https://feeds.fortinet.com/fortinet/blog/threat-research", "Name": "Fortinet FortiGuard Labs", "Category": "Vendor Research" },
+        { "Url": "https://heimdalsecurity.com/blog/feed/", "Name": "Heimdal", "Category": "Vendor Research" },
+        { "Url": "https://blog.knowbe4.com/rss.xml", "Name": "KnowBe4", "Category": "Vendor Research" },
+        { "Url": "https://www.sophos.com/en-us/category/threat-research/feed", "Name": "Sophos X-Ops", "Category": "Vendor Research" },
+        { "Url": "https://www.elastic.co/security-labs/rss/feed.xml", "Name": "Elastic Security Labs", "Category": "Vendor Research" },
+        { "Url": "https://www.rapid7.com/rss.xml", "Name": "Rapid7", "Category": "Vendor Research" },
+        { "Url": "https://www.huntress.com/blog/rss.xml", "Name": "Huntress", "Category": "Vendor Research" },
+        { "Url": "https://redcanary.com/blog/feed/", "Name": "Red Canary", "Category": "Vendor Research" },
+        { "Url": "https://www.zscaler.com/blogs/feeds/security-research", "Name": "Zscaler ThreatLabz", "Category": "Vendor Research" },
+        { "Url": "https://www.reversinglabs.com/blog/rss.xml", "Name": "ReversingLabs", "Category": "Vendor Research" },
+        { "Url": "https://www.greynoise.io/blog/rss.xml", "Name": "GreyNoise", "Category": "Vendor Research" },
+        { "Url": "https://www.recordedfuture.com/feed", "Name": "Recorded Future", "Category": "Vendor Research" },
+        { "Url": "https://flashpoint.io/feed/", "Name": "Flashpoint", "Category": "Vendor Research" },
+        { "Url": "https://cyble.com/feed/", "Name": "Cyble", "Category": "Vendor Research" },
+        { "Url": "https://www.group-ib.com/feed/blogfeed/", "Name": "Group-IB", "Category": "Vendor Research" },
+        { "Url": "https://asec.ahnlab.com/en/feed/", "Name": "AhnLab ASEC", "Category": "Vendor Research" },
+        { "Url": "https://lab52.io/blog/feed/", "Name": "Lab52", "Category": "Vendor Research" },
+        { "Url": "https://cofense.com/feed/", "Name": "Cofense", "Category": "Vendor Research" },
+        { "Url": "https://www.infoblox.com/blog/feed/", "Name": "Infoblox Threat Intel", "Category": "Vendor Research" },
+        { "Url": "https://www.cybereason.com/blog/rss.xml", "Name": "Cybereason", "Category": "Vendor Research" },
+        { "Url": "https://blog.virustotal.com/feeds/posts/default", "Name": "VirusTotal", "Category": "Vendor Research" },
+        { "Url": "https://feeds.feedburner.com/akamai/blog", "Name": "Akamai", "Category": "Vendor Research" },
+        { "Url": "https://thedfirreport.com/feed/", "Name": "The DFIR Report", "Category": "Vendor Research" },
+        { "Url": "https://www.malware-traffic-analysis.net/blog-entries.rss", "Name": "Malware Traffic Analysis", "Category": "Vendor Research" },
+        { "Url": "https://objective-see.org/rss.xml", "Name": "Objective-See (macOS)", "Category": "Vendor Research" },
+        { "Url": "https://www.threatfabric.com/blogs/rss.xml", "Name": "ThreatFabric (mobile)", "Category": "Vendor Research" },
+        { "Url": "https://horizon3.ai/feed/", "Name": "Horizon3.ai", "Category": "Vendor Research" },
+        { "Url": "https://labs.watchtowr.com/rss/", "Name": "watchTowr Labs", "Category": "Vendor Research" },
+        { "Url": "https://blog.sucuri.net/feed", "Name": "Sucuri", "Category": "Vendor Research" },
+
+        { "Url": "https://www.wiz.io/feed/rss.xml", "Name": "Wiz", "Category": "Cloud Security" },
+        { "Url": "https://www.sysdig.com/blog/rss.xml", "Name": "Sysdig", "Category": "Cloud Security" },
+        { "Url": "https://blog.aquasec.com/rss.xml", "Name": "Aqua Security", "Category": "Cloud Security" },
+        { "Url": "https://securitylabs.datadoghq.com/rss/feed.xml", "Name": "Datadog Security Labs", "Category": "Cloud Security" },
+
+        { "Url": "https://ics-cert.kaspersky.com/feed/", "Name": "Kaspersky ICS CERT", "Category": "ICS/OT" },
+
+        { "Url": "https://www.cisa.gov/cybersecurity-advisories/all.xml", "Name": "CISA Advisories", "Category": "Government/CERT" },
+        { "Url": "https://www.cisa.gov/news.xml", "Name": "CISA News", "Category": "Government/CERT" },
+        { "Url": "https://www.ncsc.gov.uk/api/1/services/v1/all-rss-feed.xml", "Name": "UK NCSC", "Category": "Government/CERT" },
+        { "Url": "https://www.cisecurity.org/feed/advisories", "Name": "CIS Advisories", "Category": "Government/CERT" },
+        { "Url": "https://isc.sans.edu/rssfeed_full.xml", "Name": "SANS ISC", "Category": "Government/CERT" },
+        { "Url": "https://www.nist.gov/blogs/cybersecurity-insights/rss.xml", "Name": "NIST Cybersecurity Insights", "Category": "Government/CERT" },
+        { "Url": "https://blogs.jpcert.or.jp/en/atom.xml", "Name": "JPCERT/CC", "Category": "Government/CERT" },
+        { "Url": "https://www.cyber.gc.ca/api/cccs/atom/v1/get?feed=alerts_advisories&lang=en", "Name": "Canadian Centre for Cyber Security", "Category": "Government/CERT" },
+
+        { "Url": "https://www.zerodayinitiative.com/rss/published/", "Name": "ZDI Published Advisories", "Category": "Vendor Advisory" },
+        { "Url": "https://sec.cloudapps.cisco.com/security/center/psirtrss20/CiscoSecurityAdvisory.xml", "Name": "Cisco PSIRT", "Category": "Vendor Advisory" },
+        { "Url": "https://filestore.fortinet.com/fortiguard/rss/ir.xml", "Name": "Fortinet PSIRT", "Category": "Vendor Advisory" },
+        { "Url": "https://security.paloaltonetworks.com/rss.xml", "Name": "Palo Alto Security Advisories", "Category": "Vendor Advisory" },
+        { "Url": "https://ubuntu.com/security/notices/rss.xml", "Name": "Ubuntu Security Notices", "Category": "Vendor Advisory" },
+        { "Url": "https://www.jenkins.io/security/advisories/rss.xml", "Name": "Jenkins Security Advisories", "Category": "Vendor Advisory" },
+        { "Url": "https://feeds.feedburner.com/GoogleChromeReleases", "Name": "Chrome Releases", "Category": "Vendor Advisory" },
+
+        { "Url": "https://www.exploit-db.com/rss.xml", "Name": "Exploit-DB", "Category": "Exploit/Disclosure" },
+        { "Url": "https://seclists.org/rss/fulldisclosure.rss", "Name": "Full Disclosure", "Category": "Exploit/Disclosure" },
+        { "Url": "https://seclists.org/rss/oss-sec.rss", "Name": "oss-security", "Category": "Exploit/Disclosure" },
+
+        { "Url": "https://www.ransomware.live/rss.xml", "Name": "ransomware.live", "Category": "Ransomware" },
+
+        { "Url": "https://feeds.feedburner.com/TheHackersNews", "Name": "The Hacker News", "Category": "News" },
+        { "Url": "https://www.bleepingcomputer.com/feed/", "Name": "BleepingComputer", "Category": "News" },
+        { "Url": "https://www.techrepublic.com/rssfeeds/topic/cybersecurity/", "Name": "TechRepublic Security", "Category": "News" },
+        { "Url": "https://feeds.feedburner.com/HackRead", "Name": "HackRead", "Category": "News" },
+        { "Url": "https://www.infosecurity-magazine.com/rss/news/", "Name": "Infosecurity Magazine", "Category": "News" },
+        { "Url": "https://krebsonsecurity.com/feed/", "Name": "Krebs on Security", "Category": "News" },
+        { "Url": "https://www.darkreading.com/rss.xml", "Name": "Dark Reading", "Category": "News" },
+        { "Url": "https://therecord.media/feed", "Name": "The Record", "Category": "News" },
+        { "Url": "https://cyberscoop.com/feed/", "Name": "CyberScoop", "Category": "News" },
+        { "Url": "https://www.securityweek.com/feed/", "Name": "SecurityWeek", "Category": "News" },
+        { "Url": "https://www.helpnetsecurity.com/feed/", "Name": "Help Net Security", "Category": "News" },
+        { "Url": "https://www.darknet.org.uk/feed/", "Name": "Darknet", "Category": "News" },
+        { "Url": "https://arstechnica.com/tag/security/feed/", "Name": "Ars Technica Security", "Category": "News" },
+        { "Url": "https://www.bellingcat.com/feed/", "Name": "Bellingcat", "Category": "News" },
+        { "Url": "https://grahamcluley.com/feed/", "Name": "Graham Cluley", "Category": "News" },
+        { "Url": "https://www.theguardian.com/technology/data-computer-security/rss", "Name": "The Guardian Security", "Category": "News" },
+        { "Url": "https://www.schneier.com/feed/atom/", "Name": "Schneier on Security", "Category": "News" },
+        { "Url": "https://securityaffairs.com/feed", "Name": "Security Affairs", "Category": "News" },
+        { "Url": "https://www.wired.com/feed/category/security/latest/rss", "Name": "WIRED Security", "Category": "News" },
+        { "Url": "https://www.exploitone.com/feed/", "Name": "ExploitOne", "Category": "News" },
+        { "Url": "https://www.theregister.com/security/headlines.atom", "Name": "The Register Security", "Category": "News" },
+        { "Url": "https://www.csoonline.com/feed/", "Name": "CSO Online", "Category": "News" },
+        { "Url": "https://risky.biz/feeds/risky-business-news/", "Name": "Risky Business News", "Category": "News" },
+
+        { "Url": "https://blog.badsectorlabs.com/feeds/all.atom.xml", "Name": "Bad Sector Labs (Last Week in Security)", "Category": "Community" },
+        { "Url": "https://cyberbuilders.substack.com/feed", "Name": "Cyber Builders", "Category": "Community" },
+        { "Url": "https://www.yeswehack.com/rss.xml", "Name": "YesWeHack", "Category": "Community" },
+        { "Url": "https://sebdraven.medium.com/feed", "Name": "Sebdraven", "Category": "Community" },
+        { "Url": "https://medium.com/feed/anton-on-security", "Name": "Anton on Security", "Category": "Community" },
+        { "Url": "https://www.reddit.com/r/cybersecurity/.rss", "Name": "r/cybersecurity", "Category": "Community" },
+        { "Url": "https://www.reddit.com/r/netsec/.rss", "Name": "r/netsec", "Category": "Community" },
+        { "Url": "https://www.reddit.com/r/blueteamsec/.rss", "Name": "r/blueteamsec", "Category": "Community" },
+        { "Url": "https://www.reddit.com/r/purpleteamsec/.rss", "Name": "r/purpleteamsec", "Category": "Community" },
+        { "Url": "https://www.reddit.com/r/redteamsec/.rss", "Name": "r/redteamsec", "Category": "Community" }
     ],
     "AllowedUrlPatterns": [
-        "^https?://",
-        "\\.xml$",
-        "\\.rss$",
-        "\\.atom$",
-        "/feed/?$",
-        "/rss/?$"
+        "^https?://"
     ],
     "UserAgents": [
-        "ThreatRaven/4.1 (+https://github.com/diyarit/ThreatRaven; RSS threat intel monitor)",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (compatible; Feedfetcher-Google; +http://www.google.com/feedfetcher.html)",
-        "FeedBurner/1.0 (http://www.FeedBurner.com)"
+        "ThreatRaven/5.0 (+https://github.com/diyarit/ThreatRaven; RSS threat intel monitor)",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     ]
 }
