@@ -136,8 +136,8 @@ Edit `config.json` (or pass `-ConfigPath`). The loader validates the file, merge
 ## Development
 
 ```powershell
-# Unit tests (Pester 5+)
-Invoke-Pester .\Tests\FeedHelpers.Tests.ps1 -Output Detailed
+# Unit tests (Pester 5+; installs Pester to CurrentUser if missing)
+.\Tests\Invoke-Tests.ps1
 
 # Live smoke test with a small feed set
 .\ThreatRaven.ps1 -ConfigPath .\Tests\smoke-config.json -NoOpenReport

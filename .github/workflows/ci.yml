@@ -9,7 +9,9 @@ on:
 
 jobs:
   pester:
-    name: Pester tests (PS 5.1 + 7)
+    # `shell:` cannot reference the matrix context, so the matrix picks the
+    # executable and a pwsh step launches it explicitly.
+    name: Pester tests (${{ matrix.shell }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -18,19 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Pester 5
-        shell: ${{ matrix.shell }}
+      - name: Run Pester tests under ${{ matrix.shell }}
+        shell: pwsh
         run: |
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module Pester -MinimumVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
-
-      - name: Run Pester tests
-        shell: ${{ matrix.shell }}
-        run: |
-          Import-Module Pester -MinimumVersion 5.5.0 -Force
-          $result = Invoke-Pester -Path ./Tests/FeedHelpers.Tests.ps1 -Output Detailed -PassThru
-          if ($result.FailedCount -gt 0) { exit 1 }
-          if ($result.PassedCount -eq 0) { Write-Error 'No tests ran'; exit 1 }
+          & ${{ matrix.shell }} -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ./Tests/Invoke-Tests.ps1
+          exit $LASTEXITCODE
 
   analyzer:
     name: PSScriptAnalyzer
