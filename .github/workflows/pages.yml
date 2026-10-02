@@ -2,7 +2,7 @@ name: Pages report
 
 on:
   push:
-    branches: [test/pages, main, master]
+    branches: [main, master]
   workflow_dispatch:
   schedule:
     # 12:17 UTC = 6:17 AM CST (winter) / 7:17 AM CDT (summer) in America/Chicago.
