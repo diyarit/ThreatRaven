@@ -1161,6 +1161,36 @@ namespace ThreatRaven
     $reportJson = ConvertTo-EmbeddedJson -InputObject $reportData -Depth 8
 
     # ---------------------------------------------------------
+    # Machine-readable feed (Grafana) + append-only run history
+    # ---------------------------------------------------------
+    $FeedPath = Join-Path $OutputDir "ThreatRaven_feed.json"
+    $feedJson = ConvertTo-Json -InputObject $reportData -Depth 8 -Compress
+    [System.IO.File]::WriteAllText($FeedPath, $feedJson, [System.Text.UTF8Encoding]::new($false))
+    Write-Log "Feed exported to: $FeedPath" -Level Info
+
+    $HistoryPath = Join-Path $OutputDir "ThreatRaven_history.json"
+    $history = @()
+    if (Test-Path -LiteralPath $HistoryPath) {
+        try { $history = @(Get-Content -LiteralPath $HistoryPath -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { $history = @() }
+    }
+    $history += [PSCustomObject]@{
+        time        = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        generated   = [string]$reportData.meta.generated
+        newCount    = [int]$NewLinksCount
+        totalCount  = [int]$AllResults.Count
+        kevArticles = [int]$KevArticleCount
+        feeds       = [int]$FeedDefs.Count
+        healthy     = [int]$healthReport.Healthy
+        degraded    = [int]$healthReport.Degraded
+        unhealthy   = [int]$healthReport.Unhealthy
+        duration    = [math]::Round($TotalDuration, 1)
+    }
+    if ($history.Count -gt 365) { $history = @($history | Select-Object -Last 365) }
+    $historyJson = ConvertTo-Json -InputObject ([object[]]$history) -Depth 4 -Compress
+    [System.IO.File]::WriteAllText($HistoryPath, $historyJson, [System.Text.UTF8Encoding]::new($false))
+    Write-Log "Run history updated: $HistoryPath ($($history.Count) runs)" -Level Info
+
+    # ---------------------------------------------------------
     # HTML report
     # ---------------------------------------------------------
     Write-Console "`nGenerating HTML report..." -ForegroundColor Cyan

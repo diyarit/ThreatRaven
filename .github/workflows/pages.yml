@@ -1,0 +1,79 @@
+name: Pages report
+
+on:
+  push:
+    branches: [test/pages, main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Generate report
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore state and history
+        uses: actions/cache@v4
+        with:
+          path: |
+            ThreatRavenState.json
+            ThreatRaven_history.json
+          key: threatraven-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            threatraven-${{ github.ref_name }}-
+            threatraven-
+
+      - name: Run ThreatRaven
+        shell: pwsh
+        env:
+          THREATRAVEN_NVD_API_KEY: ${{ secrets.THREATRAVEN_NVD_API_KEY }}
+        run: |
+          ./ThreatRaven.ps1 -StatePath ./ThreatRavenState.json -NoOpenReport -QuietMode -ExportHealthReport
+          if (-not (Test-Path ./ThreatRaven_feed.json)) { throw 'No feed generated' }
+          if (-not (Test-Path ./ThreatRaven_history.json)) { throw 'No history generated' }
+
+      - name: Assemble Pages site
+        shell: pwsh
+        run: |
+          $site = Join-Path $env:RUNNER_TEMP 'site'
+          New-Item -ItemType Directory -Path $site -Force | Out-Null
+          $html = Get-ChildItem -Path . -Filter 'APT_Report_*.html' | Sort-Object LastWriteTime | Select-Object -Last 1
+          if (-not $html) { throw 'No HTML report generated' }
+          Copy-Item $html.FullName (Join-Path $site 'index.html')
+          Copy-Item $html.FullName (Join-Path $site ('report_' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.html'))
+          Copy-Item ./ThreatRaven_feed.json $site
+          Copy-Item ./ThreatRaven_history.json $site
+          Get-ChildItem -Path . -Filter 'FeedHealth_*.json' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime | Select-Object -Last 1 |
+            ForEach-Object { Copy-Item $_.FullName (Join-Path $site 'feed-health.json') }
+          foreach ($d in 'lib', 'assets') {
+            if (Test-Path -LiteralPath $d) { Copy-Item -LiteralPath $d -Destination $site -Recurse -Force }
+          }
+          Get-ChildItem -LiteralPath $site | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Host
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
