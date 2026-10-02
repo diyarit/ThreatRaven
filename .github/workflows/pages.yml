@@ -5,7 +5,9 @@ on:
     branches: [test/pages, main, master]
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * *'   # daily at 06:00 UTC (only runs on the default branch)
+    # 12:17 UTC = 6:17 AM CST (winter) / 7:17 AM CDT (summer) in America/Chicago.
+    # Scheduled workflows only run from the default branch.
+    - cron: '17 12 * * *'
 
 permissions:
   contents: read
